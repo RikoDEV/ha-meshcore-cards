@@ -34,7 +34,7 @@ actions:
         {% set header = '@[' + (d.sender_name | default('')) + ']' %}
         {% if hex_len < 2 %}
           {{ header }}
-          ⚡ direct (brak RPT lub nie wspieram 2 byte)
+          ⚡ direct (brak RPT/nie wspieram jeszcze 2 byte)
         {% else %}
           {% set out = namespace(lines=[header], used=header | length) %}
           {% for i in range(0, path_hex | length, step) %}

@@ -9,8 +9,7 @@ triggers:
 conditions:
   - condition: template
     value_template: >-
-      {{ (trigger.event.data.message | default('') | lower).startswith('es
-      trace') }}
+      {{ (trigger.event.data.message | default('') | lower).startswith('es trace') }}
 actions:
   - variables:
       d: "{{ trigger.event.data }}"
@@ -34,7 +33,7 @@ actions:
           {% endfor %}
           {{ ns.nodes | join(' → ') }}
         {% else %}
-          ⚡ direct (brak RPT lub nie wspieram 2 byte)
+          ⚡ direct (brak RPT/nie wspieram jeszcze 2 byte)
         {% endif %}
       reply_text: >
         📡 @[{{ d.sender_name }}]
