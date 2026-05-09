@@ -21,19 +21,24 @@ actions:
       snr_val: "{{ rx0.snr if rx0.snr is defined else 'n/a' }}"
       path_hex: "{{ rx0.path if rx0.path is defined else '' }}"
       path_len: "{{ rx0.path_len if rx0.path_len is defined else 0 }}"
+      path_step: >
+        {% set pl = path_len | int %}
+        {% set hex_len = path_hex | length %}
+        {{ ((hex_len // pl) if pl > 0 else (6 if hex_len % 6 == 0 and hex_len > 0 else (4 if hex_len % 4 == 0 and hex_len > 0 else 2))) }}
       path_nodes: |
+        {% set step = path_step | int %}
         {% if path_hex | length >= 2 %}
           {% set ns = namespace(nodes=[]) %}
-          {% for i in range(0, path_hex | length, 2) %}
-            {% set ns.nodes = ns.nodes + [path_hex[i:i+2]] %}
+          {% for i in range(0, path_hex | length, step) %}
+            {% set ns.nodes = ns.nodes + [path_hex[i:i+step]] %}
           {% endfor %}
           {{ ns.nodes | join(' → ') }}
         {% else %}
-          direct
+          ⚡ direct (brak RPT lub nie wspieram 2 byte)
         {% endif %}
       reply_text: >
-        📡 Trace from {{ d.sender }} RSSI: {{ rssi_val }} dBm | SNR: {{ snr_val
-        }} dB Hops: {{ path_len }} | Path: {{ path_nodes }}
+        📡 @[{{ d.sender_name }}]
+        RSSI: {{ rssi_val }} dBm | SNR: {{ snr_val }} dB Hops: {{ path_len }} | Path: {{ path_nodes }}
   - data:
       channel_idx: 2
       message: "{{ reply_text | trim }}"

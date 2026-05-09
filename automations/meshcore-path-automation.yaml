@@ -16,24 +16,29 @@ actions:
       rx0: >-
         {{ d.rx_log_data[0] if (d.rx_log_data is defined and d.rx_log_data | length > 0) else {} }}
       path_hex: "{{ rx0.path if rx0.path is defined else '' }}"
+      path_len: "{{ rx0.path_len if rx0.path_len is defined else 0 }}"
       reply_text: |
-        {# Build pubkey_short → adv_name map from contact diagnostic entities #}
+        {# Build prefix → adv_name map keyed at 2, 4, and 6 hex chars to handle all path_hash_size modes #}
         {% set ns = namespace(map={}) %}
         {% for s in states.binary_sensor %}
           {% if s.attributes.pubkey_short is defined and s.attributes.adv_name is defined %}
-            {% set pk2 = s.attributes.pubkey_short | upper %}
-            {% set ns.map = ns.map | combine({pk2: s.attributes.adv_name}) %}
+            {% set pk = s.attributes.pubkey_short | upper %}
+            {% set ns.map = ns.map | combine({pk[0:2]: s.attributes.adv_name, pk[0:4]: s.attributes.adv_name, pk[0:6]: s.attributes.adv_name}) %}
           {% endif %}
         {% endfor %}
+        {# Derive step from hop count; if path_len is 0/missing, infer from hex length divisibility #}
+        {% set pl = path_len | int %}
+        {% set hex_len = path_hex | length %}
+        {% set step = (hex_len // pl) if pl > 0 else (6 if hex_len % 6 == 0 and hex_len > 0 else (4 if hex_len % 4 == 0 and hex_len > 0 else 2)) %}
         {# Build reply lines; enforce 200-char MeshCore message cap #}
-        {% set header = '@[' + (d.sender | default('')) + ']' %}
-        {% if path_hex | length < 2 %}
+        {% set header = '@[' + (d.sender_name | default('')) + ']' %}
+        {% if hex_len < 2 %}
           {{ header }}
-          direct (no repeaters)
+          ⚡ direct (brak RPT lub nie wspieram 2 byte)
         {% else %}
           {% set out = namespace(lines=[header], used=header | length) %}
-          {% for i in range(0, path_hex | length, 2) %}
-            {% set seg = (path_hex[i:i+2]) | upper %}
+          {% for i in range(0, path_hex | length, step) %}
+            {% set seg = (path_hex[i:i+step]) | upper %}
             {% set name = ns.map[seg] if seg in ns.map else '?' %}
             {% set line = seg ~ ': ' ~ name %}
             {% if out.used + 1 + (line | length) <= 200 %}
