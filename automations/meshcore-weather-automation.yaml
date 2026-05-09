@@ -1,0 +1,67 @@
+alias: "MeshCore Bot: Universal Weather"
+description: Responds to `es weather <city>` on channel with weather info
+triggers:
+  - trigger: event
+    event_type: meshcore_message
+    event_data:
+      message_type: channel
+      channel_idx: 2
+conditions:
+  - condition: template
+    value_template: >-
+      {{ (trigger.event.data.message | default('') | lower).startswith('es
+      weather ') }}
+actions:
+  - variables:
+      city_requested: "{{ trigger.event.data.message.split('weather ')[1] | trim }}"
+  - action: rest_command.geocode_city
+    data:
+      city: "{{ city_requested }}"
+    response_variable: geo_res
+  - if:
+      - condition: template
+        value_template: >-
+          {{ geo_res.content.results is defined and geo_res.content.results |
+          length > 0 }}
+    then:
+      - variables:
+          result: "{{ geo_res.content.results[0] }}"
+          lat: "{{ result.latitude }}"
+          lon: "{{ result.longitude }}"
+          city_full: "{{ result.name }}, {{ result.country_code | upper }}"
+      - action: rest_command.get_weather_dynamic
+        data:
+          lat: "{{ lat }}"
+          lon: "{{ lon }}"
+        response_variable: weather_res
+      - action: meshcore.send_channel_message
+        data:
+          channel_idx: 2
+          message: >
+            {% set c = weather_res.content.current %} {% set d =
+            weather_res.content.daily %}
+
+            {# Weather Icon Mapping #} {% set code = c.weather_code | int %} {%
+            set icon = "☁️" %} {% if code == 0 %} {% set icon = "☀️" %} {% elif
+            code <= 3 %} {% set icon = "⛅" %} {% elif code <= 48 %} {% set icon
+            = "🌫️" %} {% elif code <= 67 %} {% set icon = "🌧️" %} {% elif code
+            <= 77 %} {% set icon = "❄️" %} {% elif code <= 82 %} {% set icon =
+            "🌦️" %} {% elif code <= 99 %} {% set icon = "⛈️" %} {% endif %}
+
+            {# Data Extraction with defaults #} {% set temp = c.temperature_2m |
+            default('--') %} {% set hum = c.relative_humidity_2m | default('--')
+            %} {% set wind = c.wind_speed_10m | default('--') %} {% set press =
+            c.surface_pressure | default('--') %} {% set high =
+            d.temperature_2m_max[0] | default('--') %} {% set low =
+            d.temperature_2m_min[0] | default('--') %}
+
+            [Bot] {{ icon }} {{ city_full }} T: {{ temp }}°C ({{ low }}°/{{ high
+            }}°) H: {{ hum }}% | W: {{ wind }}km/h | P: {{ press }}hPa
+    else:
+      - action: meshcore.send_channel_message
+        data:
+          channel_idx: 2
+          message: >-
+            [Bot] The city of ‘{{ city_requested }}’ seems to have disappeared somewhere?
+mode: queued
+max: 10

@@ -1,5 +1,5 @@
 alias: "MeshCore Bot: Path"
-description: Responds to `es path` on channel 2 with repeater names, one per line
+description: Responds to `es path` on channel with repeater names, one per line
 triggers:
   - trigger: event
     event_type: meshcore_message

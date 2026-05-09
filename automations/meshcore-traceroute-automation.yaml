@@ -1,5 +1,5 @@
 alias: "MeshCore Bot: Trace Route"
-description: Responds to `es trace` on channel 0 with hop/signal info
+description: Responds to `es trace` on channel with hop/signal info
 triggers:
   - trigger: event
     event_type: meshcore_message
