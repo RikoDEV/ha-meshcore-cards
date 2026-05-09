@@ -2,6 +2,12 @@
 
 Custom Lovelace cards that bring a full MeshCore mesh-radio companion experience into Home Assistant — real-time chat, channel messaging, contact management, repeater telemetry, and more.
 
+<img width="2560" height="1269" alt="image" src="https://github.com/user-attachments/assets/a3b80ca7-6280-48d9-aec4-e8eb907edd9b" />
+
+---
+
+<img width="2560" height="1269" alt="image" src="https://github.com/user-attachments/assets/b269045b-1df8-4bb6-8b94-41cc757f7602" />
+
 ---
 
 ## Cards included
@@ -10,6 +16,7 @@ Custom Lovelace cards that bring a full MeshCore mesh-radio companion experience
 |------|-----------|---------|
 | `meshcore-chat-card.js` | `custom:meshcore-chat-card` | Full companion chat UI — channels, DMs, contacts, node list |
 | `meshcore-repeater-card.js` | `custom:meshcore-repeater-card` | Live repeater stats with sparkline charts |
+
 
 ---
 
