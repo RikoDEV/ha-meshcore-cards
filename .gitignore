@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+meshcore-ha-main/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log

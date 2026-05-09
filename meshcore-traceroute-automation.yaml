@@ -1,0 +1,40 @@
+alias: "MeshCore Bot: Trace Route"
+description: Responds to `es trace` on channel 0 with hop/signal info
+triggers:
+  - trigger: event
+    event_type: meshcore_message
+    event_data:
+      message_type: channel
+      channel_idx: 2
+conditions:
+  - condition: template
+    value_template: >-
+      {{ (trigger.event.data.message | default('') | lower).startswith('es
+      trace') }}
+actions:
+  - variables:
+      d: "{{ trigger.event.data }}"
+      rx0: >
+        {{ d.rx_log_data[0] if (d.rx_log_data is defined and d.rx_log_data |
+        length > 0) else {} }}
+      rssi_val: "{{ rx0.rssi if rx0.rssi is defined else 'n/a' }}"
+      snr_val: "{{ rx0.snr if rx0.snr is defined else 'n/a' }}"
+      path_hex: "{{ rx0.path if rx0.path is defined else '' }}"
+      path_len: "{{ rx0.path_len if rx0.path_len is defined else 0 }}"
+      path_nodes: |
+        {% if path_hex | length >= 2 %}
+          {% set ns = namespace(nodes=[]) %}
+          {% for i in range(0, path_hex | length, 2) %}
+            {% set ns.nodes = ns.nodes + [path_hex[i:i+2]] %}
+          {% endfor %}
+          {{ ns.nodes | join(' → ') }}
+        {% else %}
+          direct
+        {% endif %}
+      reply_text: >
+        📡 Trace from {{ d.sender }} RSSI: {{ rssi_val }} dBm | SNR: {{ snr_val
+        }} dB Hops: {{ path_len }} | Path: {{ path_nodes }}
+  - data:
+      channel_idx: 2
+      message: "{{ reply_text | trim }}"
+    action: meshcore.send_channel_message
