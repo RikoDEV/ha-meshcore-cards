@@ -373,6 +373,52 @@ views:
 
 ---
 
+## Automations
+
+The `automations/` directory contains optional bot automations that respond to channel commands.
+
+### Path automation (`meshcore-path-automation.yaml`)
+
+Responds to `es path` on channel 2 with a formatted hop list showing each repeater in the message path.
+
+**Features:**
+- Emoji markers: 📡 first hop, ↳ middle hops, 🏁 last hop
+- Resolves repeater names from HA contact entities
+- Configurable own-repeater name override
+- Splits long paths across two messages (127-char limit per message)
+- Per-user rate limit: 2 requests per minute
+
+#### Required helper
+
+Before importing the automation, create a Text helper in HA to store rate-limit state:
+
+1. Go to **Settings → Devices & Services → Helpers → + Create Helper → Text**
+2. Set **Name** to `meshcore_path_ratelimit`
+3. Leave max length at 255 (or increase to 1024 in `configuration.yaml` if you have many active users)
+4. Save — the entity ID will be `input_text.meshcore_path_ratelimit`
+
+Alternatively, add it to `configuration.yaml`:
+
+```yaml
+input_text:
+  meshcore_path_ratelimit:
+    name: MeshCore Path Rate Limit
+    max: 1024
+```
+
+#### Configuration
+
+Edit the two lines at the top of the `reply_text` template inside the automation:
+
+```yaml
+{% set my_rpt_prefix = 'B37E15' %}   # first 6 hex chars of your repeater's pubkey
+{% set my_rpt_name   = 'My Repeater' %}  # friendly name to show instead of the pubkey
+```
+
+Set `my_rpt_prefix` to `''` to disable the override.
+
+---
+
 ## Related
 
 - [meshcore-ha integration](https://github.com/meshcore-dev/meshcore-ha) — the HA integration these cards depend on

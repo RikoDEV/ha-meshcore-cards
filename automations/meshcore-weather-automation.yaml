@@ -12,6 +12,8 @@ conditions:
       {{ (trigger.event.data.message | default('') | lower).startswith('es
       weather ') }}
 actions:
+  - delay:
+      seconds: 2
   - variables:
       city_requested: "{{ trigger.event.data.message.split('weather ')[1] | trim }}"
   - action: rest_command.geocode_city
@@ -21,8 +23,7 @@ actions:
   - if:
       - condition: template
         value_template: >-
-          {{ geo_res.content.results is defined and geo_res.content.results |
-          length > 0 }}
+          {{ geo_res.content.results is defined and geo_res.content.results | length > 0 }}
     then:
       - variables:
           result: "{{ geo_res.content.results[0] }}"

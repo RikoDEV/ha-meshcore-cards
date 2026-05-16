@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 meshcore-ha-main/
+meshcore-docs-main/
 
 # OS
 .DS_Store

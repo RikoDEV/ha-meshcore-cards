@@ -11,6 +11,8 @@ conditions:
     value_template: >-
       {{ (trigger.event.data.message | default('') | lower).startswith('es trace') }}
 actions:
+  - delay:
+      seconds: 2
   - variables:
       d: "{{ trigger.event.data }}"
       rx0: >

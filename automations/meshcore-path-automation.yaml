@@ -11,44 +11,147 @@ conditions:
     value_template: >-
       {{ (trigger.event.data.message | default('') | lower).startswith('es path') }}
 actions:
+  - delay:
+      seconds: 2
   - variables:
       d: "{{ trigger.event.data }}"
       rx0: >-
         {{ d.rx_log_data[0] if (d.rx_log_data is defined and d.rx_log_data | length > 0) else {} }}
       path_hex: "{{ rx0.path if rx0.path is defined else '' }}"
       path_len: "{{ rx0.path_len if rx0.path_len is defined else 0 }}"
+      recent_count: >-
+        {% set raw = states('input_text.meshcore_path_ratelimit') | default('') %}
+        {% set now_ts = now() | as_timestamp %}
+        {% set sender = d.sender_name | default('') %}
+        {% set ns = namespace(count=0) %}
+        {% for entry in raw.split('|') %}
+          {% if entry | trim != '' %}
+            {% set parts = entry.split(':') %}
+            {% if parts | length >= 2 and parts[0] == sender %}
+              {% for t in parts[1].split(',') %}
+                {% if t | trim != '' and t | float(0) > now_ts - 60 %}
+                  {% set ns.count = ns.count + 1 %}
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.count }}
       reply_text: |
-        {# Build prefix → adv_name map keyed at 2, 4, and 6 hex chars to handle all path_hash_size modes #}
+        {# ── Configure your repeater here ── #}
+        {% set my_rpt_prefix = 'B3' %}
+        {% set my_rpt_name   = 'RPT-WOLA-RAK by riko' %}
+        {# ─────────────────────────────────── #}
+        {# Build prefix → adv_name map keyed at 2, 4, and 6 hex chars #}
         {% set ns = namespace(map={}) %}
         {% for s in states.binary_sensor %}
-          {% if s.attributes.pubkey_short is defined and s.attributes.adv_name is defined %}
-            {% set pk = s.attributes.pubkey_short | upper %}
+          {% if s.attributes.public_key is defined and s.attributes.adv_name is defined %}
+            {% set pk = s.attributes.public_key | upper %}
             {% set ns.map = ns.map | combine({pk[0:2]: s.attributes.adv_name, pk[0:4]: s.attributes.adv_name, pk[0:6]: s.attributes.adv_name}) %}
           {% endif %}
         {% endfor %}
-        {# Derive step from hop count; if path_len is 0/missing, infer from hex length divisibility #}
+        {# Derive step size from hop count; fall back to hex-length divisibility #}
         {% set pl = path_len | int %}
         {% set hex_len = path_hex | length %}
         {% set step = (hex_len // pl) if pl > 0 else (6 if hex_len % 6 == 0 and hex_len > 0 else (4 if hex_len % 4 == 0 and hex_len > 0 else 2)) %}
-        {# Build reply lines; enforce 200-char MeshCore message cap #}
+        {# Collect segments #}
+        {% set segs = namespace(list=[]) %}
+        {% for i in range(0, hex_len, step) %}
+          {% set segs.list = segs.list + [(path_hex[i:i+step]) | upper] %}
+        {% endfor %}
+        {% set total = segs.list | length %}
         {% set header = '@[' + (d.sender_name | default('')) + ']' %}
         {% if hex_len < 2 %}
           {{ header }}
-          ⚡ direct (brak RPT/nie wspieram jeszcze 2 byte)
+          ⚡ direct (brak RPT/nie wspieram regionów)|||
         {% else %}
-          {% set out = namespace(lines=[header], used=header | length) %}
-          {% for i in range(0, path_hex | length, step) %}
-            {% set seg = (path_hex[i:i+step]) | upper %}
-            {% set name = ns.map[seg] if seg in ns.map else '?' %}
-            {% set line = seg ~ ': ' ~ name %}
-            {% if out.used + 1 + (line | length) <= 200 %}
-              {% set out.lines = out.lines + [line] %}
-              {% set out.used = out.used + 1 + (line | length) %}
+          {# Fill msg1 until 127 chars, spill remainder into msg2 #}
+          {% set m1 = namespace(lines=[header], used=header | length) %}
+          {% set m2 = namespace(lines=[], used=0) %}
+          {% set spill = namespace(v=false) %}
+          {% for i in range(total) %}
+            {% set seg = segs.list[i] %}
+            {% if my_rpt_prefix != '' and seg.startswith(my_rpt_prefix | upper) %}
+              {% set name = my_rpt_name if my_rpt_name != '' else seg %}
+            {% elif seg in ns.map %}
+              {% set name = ns.map[seg] %}
+            {% else %}
+              {% set name = '?' %}
+            {% endif %}
+            {% if i == 0 %}
+              {% set emoji = '📡 ' %}
+            {% elif i == total - 1 %}
+              {% set emoji = '🏁 ' %}
+            {% else %}
+              {% set emoji = '↳ ' %}
+            {% endif %}
+            {% set line = emoji ~ seg ~ ': ' ~ name %}
+            {% if not spill.v and m1.used + 1 + (line | length) <= 127 %}
+              {% set m1.lines = m1.lines + [line] %}
+              {% set m1.used = m1.used + 1 + (line | length) %}
+            {% else %}
+              {% set spill.v = true %}
+              {% if m2.used + 1 + (line | length) <= 127 %}
+                {% set m2.lines = m2.lines + [line] %}
+                {% set m2.used = m2.used + 1 + (line | length) %}
+              {% endif %}
             {% endif %}
           {% endfor %}
-          {{ out.lines | join('\n') }}
+          {{ m1.lines | join('\n') }}|||{{ m2.lines | join('\n') }}
         {% endif %}
-  - data:
-      channel_idx: 2
-      message: "{{ reply_text | trim }}"
-    action: meshcore.send_channel_message
+  - if:
+      - condition: template
+        value_template: "{{ recent_count | int >= 2 }}"
+    then:
+      - data:
+          channel_idx: 2
+          message: "@[{{ d.sender_name | default('') }}] ⏱️ Rate limit: max 2 req/min"
+        action: meshcore.send_channel_message
+    else:
+      - action: input_text.set_value
+        data:
+          entity_id: input_text.meshcore_path_ratelimit
+          value: >-
+            {% set raw = states('input_text.meshcore_path_ratelimit') | default('') %}
+            {% set now_ts = now() | as_timestamp %}
+            {% set sender = d.sender_name | default('') %}
+            {% set ns = namespace(entries=[], found=false) %}
+            {% for entry in raw.split('|') %}
+              {% if entry | trim != '' %}
+                {% set parts = entry.split(':') %}
+                {% if parts | length >= 2 %}
+                  {% set user = parts[0] %}
+                  {% set ts_ns = namespace(kept=[]) %}
+                  {% for t in parts[1].split(',') %}
+                    {% if t | trim != '' and t | float(0) > now_ts - 60 %}
+                      {% set ts_ns.kept = ts_ns.kept + [t | trim] %}
+                    {% endif %}
+                  {% endfor %}
+                  {% if user == sender %}
+                    {% set ts_ns.kept = ts_ns.kept + [now_ts | string] %}
+                    {% set ns.found = true %}
+                  {% endif %}
+                  {% if ts_ns.kept | length > 0 %}
+                    {% set ns.entries = ns.entries + [user + ':' + (ts_ns.kept | join(','))] %}
+                  {% endif %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {% if not ns.found %}
+              {% set ns.entries = ns.entries + [sender + ':' + (now_ts | string)] %}
+            {% endif %}
+            {{ ns.entries | join('|') }}
+      - data:
+          channel_idx: 2
+          message: "{{ reply_text.split('|||')[0] | trim }}"
+        action: meshcore.send_channel_message
+      - if:
+          - condition: template
+            value_template: "{{ reply_text.split('|||')[1] | trim | length > 0 }}"
+        then:
+          - delay:
+              seconds: 3
+          - data:
+              channel_idx: 2
+              message: "{{ reply_text.split('|||')[1] | trim }}"
+            action: meshcore.send_channel_message
