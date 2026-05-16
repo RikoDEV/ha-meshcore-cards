@@ -217,7 +217,8 @@ const STYLE = `
   .chart .head .last {
     color: var(--text); font-size: 13px; font-weight: 700;
   }
-  .chart svg { width: 100%; height: 60px; display: block; }
+  .chart { position: relative; }
+  .chart svg { width: 100%; height: 60px; display: block; cursor: crosshair; }
   .chart .axis {
     display: flex; justify-content: space-between;
     color: var(--text3); font-size: 10px; margin-top: 3px;
@@ -227,6 +228,21 @@ const STYLE = `
     display: flex; align-items: center; justify-content: center;
     min-height: 84px;
   }
+  .chart-tip {
+    position: absolute;
+    background: var(--bg, #161a1d);
+    border: 1px solid var(--border, #2a3038);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px; font-weight: 600;
+    color: var(--text, #e2e8f0);
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 20;
+    display: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,.4);
+  }
+  .chart-tip .tip-time { color: var(--text3); font-weight: 400; margin-left: 5px; font-size: 10px; }
 
   /* Empty + error states */
   .placeholder {
@@ -240,14 +256,36 @@ const STYLE = `
     background: var(--bg2); padding: 1px 4px; border-radius: 3px;
     color: var(--text);
   }
+
+  /* Neighbor map */
+  .nbr-wrap {
+    margin: 0 12px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .nbr-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--text3);
+    padding: 5px 10px 4px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+  }
+  .nbr-map-container { height: 280px; position: relative; }
+  .nbr-map-container ha-map { display: block; height: 100%; }
+  .nbr-empty {
+    padding: 14px; font-size: 12px; color: var(--text3);
+    text-align: center; line-height: 1.6; background: var(--bg2);
+  }
+
 `;
 
-function fmtUptime(min) {
-  if (min == null || isNaN(min)) return "—";
-  const m = Math.max(0, Math.round(min));
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  const rm = m % 60;
+function fmtUptime(days) {
+  if (days == null || isNaN(days)) return "—";
+  const totalMin = Math.max(0, Math.round(days * 24 * 60));
+  if (totalMin < 60) return `${totalMin}m`;
+  const h = Math.floor(totalMin / 60);
+  const rm = totalMin % 60;
   if (h < 24) return `${h}h ${rm}m`;
   const d = Math.floor(h / 24);
   const rh = h % 24;
@@ -316,6 +354,7 @@ class MeshcoreRepeaterCard extends HTMLElement {
         ? config.charts.slice() : DEFAULT_CHART_KEYS.slice(),
       stats: Array.isArray(config?.stats) && config.stats.length
         ? config.stats.slice() : DEFAULT_STAT_KEYS.slice(),
+      entry_id: config?.entry_id || null,
     };
     if (this._config.repeater) this._selectedPubkey = String(this._config.repeater).toLowerCase();
     this._render();
@@ -334,6 +373,7 @@ class MeshcoreRepeaterCard extends HTMLElement {
     } else {
       this._renderStats();
       this._renderHeader();
+      this._renderNeighborMap();
     }
   }
 
@@ -502,10 +542,12 @@ class MeshcoreRepeaterCard extends HTMLElement {
       <div class="card">
         <div class="header" id="hdr"></div>
         <div class="stats" id="stats"></div>
+        <div id="neighbors"></div>
         <div class="charts" id="charts"></div>
       </div>`;
     this._renderHeader();
     this._renderStats();
+    this._renderNeighborMap();
     this._renderCharts();
   }
 
@@ -547,6 +589,7 @@ class MeshcoreRepeaterCard extends HTMLElement {
       this._historyLoadedFor = null;
       this._renderHeader();
       this._renderStats();
+      this._renderNeighborMap();
       this._renderCharts();
       this._loadHistory(false);
     });
@@ -579,13 +622,162 @@ class MeshcoreRepeaterCard extends HTMLElement {
     el.innerHTML = html;
   }
 
+  _getNeighbors() {
+    if (!this._hass?.states || !this._selectedPubkey) return [];
+    const repPrefix = this._selectedPubkey.toLowerCase(); // 10 chars
+    const neighbors = [];
+    for (const [id, st] of Object.entries(this._hass.states)) {
+      if (!id.startsWith(`sensor.meshcore_${repPrefix}_neighbor_`)) continue;
+      if (id.endsWith("_seen")) continue;
+      const snr = parseFloat(st.state);
+      if (isNaN(snr)) continue;
+      const neighborPk = st.attributes?.pubkey_prefix || "";
+      const seenSt = this._hass.states[`${id}_seen`];
+      const seen48h = seenSt ? parseInt(seenSt.state, 10) : null;
+      // Look up neighbor GPS from their contact binary_sensor.
+      let lat = null, lon = null;
+      if (neighborPk) {
+        const prefix6 = neighborPk.slice(0, 6).toLowerCase();
+        for (const [cid, cst] of Object.entries(this._hass.states)) {
+          if (!cid.endsWith("_contact")) continue;
+          const pk = (cst.attributes?.public_key || "").toLowerCase();
+          if (pk.startsWith(prefix6)) {
+            lat = cst.attributes?.latitude || cst.attributes?.adv_lat || null;
+            lon = cst.attributes?.longitude || cst.attributes?.adv_lon || null;
+            if (lat && lon) break;
+          }
+        }
+      }
+      neighbors.push({
+        pubkey: neighborPk,
+        name: st.attributes?.resolved_name || neighborPk.slice(0, 6) || "?",
+        snr,
+        lastSeen: st.attributes?.last_seen || "",
+        seen48h: isNaN(seen48h) ? null : seen48h,
+        lat: (lat && lat !== 0) ? lat : null,
+        lon: (lon && lon !== 0) ? lon : null,
+      });
+    }
+    return neighbors;
+  }
+
+  _snrColor(snr) {
+    if (snr >= 0)   return "#4ade80";
+    if (snr >= -5)  return "#a3e635";
+    if (snr >= -12) return "#facc15";
+    if (snr >= -20) return "#fb923c";
+    return "#f87171";
+  }
+
+  // Resolve the binary_sensor.*_contact entity ID for a given pubkey 6-char prefix.
+  _contactEntityFor(prefix6) {
+    for (const [id, st] of Object.entries(this._hass.states)) {
+      if (!id.endsWith("_contact")) continue;
+      const pk = (st.attributes?.public_key || "").toLowerCase();
+      if (pk.startsWith(prefix6)) return id;
+    }
+    return null;
+  }
+
+  async _renderNeighborMap() {
+    const el = this.shadowRoot.getElementById("neighbors");
+    if (!el) return;
+    if (!this._selectedPubkey || !this._hass?.states) { el.innerHTML = ""; return; }
+
+    const neighbors = this._getNeighbors();
+    if (!neighbors.length) {
+      el.innerHTML = `<div class="nbr-wrap"><div class="nbr-empty">No neighbor data.<br>Enable repeater neighbor tracking in integration settings.</div></div>`;
+      return;
+    }
+
+    // Find repeater's own contact entity and GPS.
+    const rep6 = this._selectedPubkey.slice(0, 6).toLowerCase();
+    const selfEntityId = this._contactEntityFor(rep6);
+    const selfSt = selfEntityId ? this._hass.states[selfEntityId] : null;
+    const selfLat = selfSt?.attributes?.latitude || selfSt?.attributes?.adv_lat || null;
+    const selfLon = selfSt?.attributes?.longitude || selfSt?.attributes?.adv_lon || null;
+
+    // Build entity list and paths for ha-map.
+    const entities = [];
+    const paths = [];
+    if (selfEntityId) entities.push({ entity_id: selfEntityId, color: "#38bdf8" });
+
+    for (const n of neighbors) {
+      const color = this._snrColor(n.snr);
+      const nEntityId = n.pubkey ? this._contactEntityFor(n.pubkey.slice(0, 6).toLowerCase()) : null;
+      if (nEntityId) entities.push({ entity_id: nEntityId, color });
+      if (selfLat && selfLon && n.lat && n.lon) {
+        paths.push({
+          points: [{ latitude: selfLat, longitude: selfLon }, { latitude: n.lat, longitude: n.lon }],
+          color,
+          radius: 2,
+          line: true,
+        });
+      }
+    }
+
+    const withGps = neighbors.filter((n) => n.lat && n.lon).length;
+    const title = `Neighbors (${neighbors.length}${withGps < neighbors.length ? `, ${withGps} on map` : ""})`;
+    const newKey = `${this._selectedPubkey}|${neighbors.map((n) => `${n.pubkey}:${n.snr}`).join(",")}`;
+
+    // If ha-map already exists and data key is unchanged, just refresh hass.
+    const existing = el.querySelector("ha-map");
+    if (existing && el.dataset.mapKey === newKey) {
+      existing.hass = this._hass;
+      return;
+    }
+    el.dataset.mapKey = newKey;
+
+    // ha-map is lazy-loaded by HA. Trigger loading via loadCardHelpers → map card,
+    // which pulls in the same module that registers ha-map as a side-effect.
+    if (!customElements.get("ha-map")) {
+      try {
+        if (typeof window.loadCardHelpers === "function") {
+          const helpers = await window.loadCardHelpers();
+          // createCardElement("map") triggers the dynamic import of hui-map-card,
+          // which statically imports ha-map and registers the custom element.
+          await helpers.createCardElement({ type: "map", entities: [] });
+        }
+        await Promise.race([
+          customElements.whenDefined("ha-map"),
+          new Promise((_, rej) => setTimeout(() => rej(), 10000)),
+        ]);
+      } catch {
+        el.innerHTML = `<div class="nbr-wrap"><div class="nbr-empty">Could not load ha-map.</div></div>`;
+        return;
+      }
+    }
+
+    // Build the DOM: title bar + ha-map inside a fixed-height container.
+    const wrap = document.createElement("div");
+    wrap.className = "nbr-wrap";
+    wrap.innerHTML = `<div class="nbr-title">${esc(title)}</div>`;
+
+    const container = document.createElement("div");
+    container.className = "nbr-map-container";
+    wrap.appendChild(container);
+
+    const haMap = document.createElement("ha-map");
+    haMap.hass = this._hass;
+    haMap.entities = entities;
+    haMap.paths = paths;
+    if (selfLat && selfLon) {
+      haMap.centerLatLng = [selfLat, selfLon];
+      haMap.zoom = 9;
+    }
+    container.appendChild(haMap);
+
+    el.innerHTML = "";
+    el.appendChild(wrap);
+  }
+
   _renderCharts() {
     const el = this.shadowRoot.getElementById("charts");
     if (!el) return;
     const r = this._selected();
     if (!r) { el.innerHTML = ""; return; }
 
-    const cards = this._config.charts.map(key => {
+    const cards = this._config.charts.map((key, idx) => {
       const eid = r.sensorEntries[key];
       const meta = STAT_META[key] || { label: key, unit: "" };
       const live = eid ? this._hass?.states?.[eid]?.state : null;
@@ -594,13 +786,14 @@ class MeshcoreRepeaterCard extends HTMLElement {
       const svg = points.length >= 2 ? this._sparkline(points, key) : "";
       const empty = points.length < 2;
       return `
-        <div class="chart ${empty ? "empty" : ""}" title="${esc(eid || "")}">
+        <div class="chart ${empty ? "empty" : ""}" data-chart-idx="${idx}">
           ${empty ? `<div>No history yet for ${esc(meta.label.toLowerCase())}.</div>` : `
             <div class="head">
               <span class="label">${meta.icon ? `${meta.icon} ` : ""}${esc(meta.label)}</span>
-              <span class="last">${esc(fmt.value)}${fmt.unit ? ` <small style="color:var(--text3)">${esc(fmt.unit)}</small>` : ""}</span>
+              <span class="last" data-live>${esc(fmt.value)}${fmt.unit ? ` <small style="color:var(--text3)">${esc(fmt.unit)}</small>` : ""}</span>
             </div>
             ${svg}
+            <div class="chart-tip"></div>
             <div class="axis">
               <span>−${this._config.hours}h</span>
               <span>now</span>
@@ -608,6 +801,87 @@ class MeshcoreRepeaterCard extends HTMLElement {
         </div>`;
     }).join("");
     el.innerHTML = cards;
+    this._wireChartHover(el, r);
+  }
+
+  _wireChartHover(el, r) {
+    el.querySelectorAll(".chart:not(.empty)").forEach((chartEl) => {
+      const idx = parseInt(chartEl.dataset.chartIdx, 10);
+      const key = this._config.charts[idx];
+      if (!key) return;
+      const eid = r.sensorEntries[key];
+      const allPts = (eid && this._history[eid]) || [];
+      const meta = STAT_META[key] || { label: key, unit: "" };
+      const now = Date.now();
+      const xMin = now - this._config.hours * 3600 * 1000;
+      const pts = allPts.filter(p => p.ts >= xMin);
+      if (pts.length < 2) return;
+
+      const svgEl = chartEl.querySelector("svg");
+      const tip = chartEl.querySelector(".chart-tip");
+      const liveEl = chartEl.querySelector("[data-live]");
+      const cursorLine = svgEl?.querySelector(".hc");
+      const dot = svgEl?.querySelector(".hd");
+      if (!svgEl || !tip || !cursorLine || !dot) return;
+
+      const W = 240, H = 60, PAD = 4;
+      const xMax = now;
+      const ys = pts.map(p => p.v);
+      let yMin = Math.min(...ys), yMax = Math.max(...ys);
+      if (yMin === yMax) { yMin -= 1; yMax += 1; }
+      if (key === "battery_percentage") { yMin = Math.min(0, yMin); yMax = Math.max(100, yMax); }
+      const yScale = v => H - PAD - ((v - yMin) / (yMax - yMin)) * (H - 2 * PAD);
+
+      // Store the live label text so we can restore it on mouseleave.
+      const liveText = liveEl ? liveEl.innerHTML : "";
+
+      svgEl.addEventListener("mousemove", (e) => {
+        const rect = svgEl.getBoundingClientRect();
+        const xFrac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const ts = xMin + xFrac * (xMax - xMin);
+
+        // Nearest point by timestamp.
+        let nearest = pts[0];
+        let best = Math.abs(pts[0].ts - ts);
+        for (const p of pts) {
+          const d = Math.abs(p.ts - ts);
+          if (d < best) { best = d; nearest = p; }
+        }
+
+        // Update SVG cursor + dot.
+        const svgX = (PAD + xFrac * (W - 2 * PAD)).toFixed(1);
+        const svgY = yScale(nearest.v).toFixed(1);
+        cursorLine.setAttribute("x1", svgX); cursorLine.setAttribute("x2", svgX);
+        dot.setAttribute("cx", svgX); dot.setAttribute("cy", svgY);
+        cursorLine.style.display = ""; dot.style.display = "";
+
+        // Tooltip content.
+        const fmt = pickFmt(key, nearest.v);
+        const d = new Date(nearest.ts);
+        const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        const dateStr = d.toLocaleDateString([], { month: "short", day: "numeric" });
+        tip.innerHTML = `${esc(fmt.value)}${fmt.unit ? `<span style="color:var(--text3);margin-left:2px;font-size:10px">${esc(fmt.unit)}</span>` : ""}<span class="tip-time">${esc(dateStr)} ${esc(timeStr)}</span>`;
+        tip.style.display = "block";
+
+        // Position tooltip: keep it inside the chart horizontally.
+        const chartRect = chartEl.getBoundingClientRect();
+        const svgTop = rect.top - chartRect.top;
+        const rawLeft = e.clientX - chartRect.left;
+        const tipW = tip.offsetWidth || 140;
+        tip.style.top = `${Math.max(0, svgTop - 28)}px`;
+        tip.style.left = `${Math.max(0, Math.min(rawLeft - tipW / 2, chartRect.width - tipW))}px`;
+
+        // Show hovered value in the header instead of live value.
+        if (liveEl) liveEl.innerHTML = tip.innerHTML;
+      });
+
+      svgEl.addEventListener("mouseleave", () => {
+        cursorLine.style.display = "none";
+        dot.style.display = "none";
+        tip.style.display = "none";
+        if (liveEl) liveEl.innerHTML = liveText;
+      });
+    });
   }
 
   // Build a sparkline polyline + smooth fill underneath for a series of
@@ -648,6 +922,8 @@ class MeshcoreRepeaterCard extends HTMLElement {
         </defs>
         <path d="${areaPath}" fill="url(#g)" stroke="none"/>
         <path d="${linePath}" fill="none" stroke="${colour}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <line class="hc" x1="0" y1="${PAD}" x2="0" y2="${H - PAD}" stroke="var(--text3,#64748b)" stroke-width="1" stroke-dasharray="3 2" style="display:none" pointer-events="none"/>
+        <circle class="hd" cx="0" cy="0" r="3" fill="${colour}" stroke="var(--bg,#161a1d)" stroke-width="1.5" style="display:none" pointer-events="none"/>
       </svg>`;
   }
 
