@@ -618,6 +618,7 @@ const STYLE = `
     display: flex;
     flex-direction: column;
     min-width: 0;
+    position: relative;
   }
   .chat-header {
     padding: 12px 16px;
@@ -3187,7 +3188,7 @@ class MeshcoreChatCard extends HTMLElement {
     const shadow = this.shadowRoot;
     shadow.innerHTML = `<style>${STYLE}</style><div class="card" style="position:relative">
       <div class="sidebar" id="sidebar"></div>
-      <div class="chat-panel" style="position:relative">
+      <div class="chat-panel">
         <div class="chat-header" id="chat-header"></div>
         <div class="messages-area" id="messages-area"></div>
         <div class="autocomplete-popup" id="autocomplete-popup" hidden></div>
