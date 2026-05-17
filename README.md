@@ -6,7 +6,7 @@ Custom Lovelace cards that bring a full MeshCore mesh-radio companion experience
 
 ---
 
-<img width="2560" height="1269" alt="image" src="https://github.com/user-attachments/assets/b269045b-1df8-4bb6-8b94-41cc757f7602" />
+<img width="2560" height="1269" alt="chrome_1T4sxWenCA" src="https://github.com/user-attachments/assets/96ed2ad6-b4d6-49ff-ab70-ab10b54f2996" />
 
 ---
 
