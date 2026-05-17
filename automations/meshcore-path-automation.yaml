@@ -40,7 +40,7 @@ actions:
       reply_text: |
         {# ── Configure your repeater here ── #}
         {% set my_rpt_prefix = 'B3' %}
-        {% set my_rpt_name   = 'RPT-WOLA-RAK by riko' %}
+        {% set my_rpt_name   = 'Your repeater name' %}
         {# ─────────────────────────────────── #}
         {# Build prefix → adv_name map keyed at 2, 4, and 6 hex chars #}
         {% set ns = namespace(map={}) %}
@@ -63,7 +63,7 @@ actions:
         {% set header = '@[' + (d.sender_name | default('')) + ']' %}
         {% if hex_len < 2 %}
           {{ header }}
-          ⚡ direct (brak RPT/nie wspieram regionów)|||
+          ⚡ direct (zero RPT/region scope unsupported)|||
         {% else %}
           {# Fill msg1 until 127 chars, spill remainder into msg2 #}
           {% set m1 = namespace(lines=[header], used=header | length) %}

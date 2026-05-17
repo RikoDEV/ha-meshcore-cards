@@ -63,6 +63,6 @@ actions:
         data:
           channel_idx: 2
           message: >-
-            [Bot] The city of ‘{{ city_requested }}’ seems to have disappeared somewhere?
+            [Bot] The city ‘{{ city_requested }}’ seems to have disappeared somewhere?
 mode: queued
 max: 10
