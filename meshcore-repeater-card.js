@@ -40,6 +40,7 @@
  *                                 # in Settings → Devices & services → MeshCore →
  *                                 # click the integration → copy the ID from the
  *                                 # URL: /config/integrations/integration/meshcore#<ID>
+ *   login_password: ""         # Admin password for send_login (leave blank if none)
  *
  * Visual editor: configurable through the Lovelace UI editor as
  * `meshcore-repeater-card`.
@@ -49,10 +50,15 @@ const REPEATER_CARD_VERSION = "1.0.0";
 console.info(
   `%c MESHCORE-REPEATER-CARD %c v${REPEATER_CARD_VERSION} `,
   "color:#fff;background:#1976d2;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px",
-  "color:#1976d2;background:#e3f2fd;font-weight:700;padding:2px 4px;border-radius:0 3px 3px 0"
+  "color:#1976d2;background:#e3f2fd;font-weight:700;padding:2px 4px;border-radius:0 3px 3px 0",
 );
 
-const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const esc = (s) =>
+  String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 
 const STAT_META = {
   battery_percentage: { label: "Battery", unit: "%", icon: "🔋" },
@@ -108,6 +114,7 @@ const STYLE = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   .card {
+    position: relative;
     background: var(--bg);
     border-radius: 12px;
     border: 1px solid var(--border);
@@ -284,33 +291,45 @@ const STYLE = `
     text-align: center; line-height: 1.6; background: var(--bg2);
   }
 
-  /* CLI console */
-  .console-wrap {
-    margin: 0 12px 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  .console-title {
-    display: flex; justify-content: space-between; align-items: center;
-    font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
-    color: var(--text3);
-    padding: 5px 10px 4px;
-    background: var(--bg2);
+  /* Tabs */
+  .tabs {
+    display: flex;
     border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    user-select: none;
+    background: var(--bg2);
   }
-  .console-title .toggle { font-size: 12px; color: var(--text2); }
-  .console-body { display: none; }
-  .console-body.open { display: flex; flex-direction: column; }
+  .tab-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text2);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 10px 8px 8px;
+    cursor: pointer;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.15s, border-color 0.15s;
+    font-family: inherit;
+    outline: none;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* CLI console */
   .console-log {
     font-family: 'Consolas', 'Courier New', monospace;
     font-size: 11px;
     line-height: 1.5;
     padding: 8px 10px;
     background: var(--bg);
-    max-height: 200px;
+    min-height: 300px;
+    max-height: 400px;
     overflow-y: auto;
     white-space: pre-wrap;
     word-break: break-all;
@@ -319,6 +338,32 @@ const STYLE = `
   .console-log .cl-recv { color: var(--online, #4ade80); }
   .console-log .cl-err  { color: var(--danger, #ef4444); }
   .console-log .cl-info { color: var(--text3); }
+  .cl-help {
+    display: flex; flex-direction: column; gap: 10px;
+    align-items: center; justify-content: center;
+    height: 100%; min-height: 200px;
+    padding: 24px 20px;
+    text-align: center;
+    word-break: normal;
+    white-space: normal;
+  }
+  .cl-help-title {
+    font-size: 13px; font-weight: 700; color: var(--text2);
+    letter-spacing: 0.04em;
+  }
+  .cl-help-desc { font-size: 11px; color: var(--text3); line-height: 1.6; max-width: 340px; }
+  .cl-help-cmds {
+    display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+  }
+  .cl-help-cmds span {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    color: var(--text2);
+    font-family: 'Consolas', 'Courier New', monospace;
+  }
   .console-input {
     display: flex;
     border-top: 1px solid var(--border);
@@ -341,7 +386,7 @@ const STYLE = `
   .console-input input:focus { border-color: var(--accent); }
   .console-input button {
     background: var(--accent);
-    color: #fff;
+    color: var(--text-primary-color, #fff);
     border: none;
     border-radius: 4px;
     padding: 4px 12px;
@@ -351,6 +396,118 @@ const STYLE = `
     white-space: nowrap;
   }
   .console-input button:disabled { opacity: 0.5; cursor: default; }
+
+  /* Repeater settings */
+  .rpt-actions {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+  }
+  .rpt-actions button {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text2);
+    font-size: 11px; font-weight: 600;
+    padding: 3px 10px;
+    cursor: pointer;
+    font-family: 'Consolas', 'Courier New', monospace;
+  }
+  .rpt-actions button:hover { border-color: var(--accent); color: var(--accent); }
+  .rpt-actions button.btn-warn { color: var(--warn, #f97316); border-color: var(--warn, #f97316); }
+  .rpt-actions button.btn-warn:hover { background: rgba(249,115,22,0.12); }
+  .rpt-actions button.btn-danger { color: var(--danger, #ef4444); border-color: var(--danger, #ef4444); }
+  .rpt-actions button.btn-danger:hover { background: rgba(239,68,68,0.12); }
+  .rpt-form { padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .rpt-row {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .rpt-row .rpt-label {
+    flex: 0 0 130px;
+    font-size: 11px; font-weight: 600; color: var(--text2);
+    white-space: nowrap;
+  }
+  .rpt-row input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 12px;
+    padding: 3px 7px;
+    outline: none;
+    font-family: inherit;
+    min-width: 0;
+  }
+  .rpt-row input:focus { border-color: var(--accent); }
+  .rpt-row button {
+    flex: 0 0 auto;
+    background: var(--accent);
+    color: var(--text-primary-color, #fff);
+    border: none;
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .rpt-row button:disabled { opacity: 0.5; cursor: default; }
+  .rpt-section-head {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--text3);
+    padding: 6px 0 2px;
+    margin-top: 2px;
+    border-top: 1px solid var(--border);
+  }
+  .rpt-section-head:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+  .rpt-row .btn-get {
+    flex: 0 0 auto;
+    background: transparent;
+    color: var(--text3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 10px;
+    cursor: pointer;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-weight: 600;
+  }
+  .rpt-row .btn-get:hover { color: var(--accent); border-color: var(--accent); }
+  .rpt-apply-all {
+    background: transparent !important;
+    color: var(--accent) !important;
+    border: 1px solid var(--accent) !important;
+    width: 100%;
+    text-align: center;
+  }
+
+  /* Toast */
+  .rpt-toast {
+    position: fixed;
+    bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 200px;
+    max-width: 420px;
+    background: var(--bg, #161a1d);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--text);
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    font-family: 'Consolas', 'Courier New', monospace;
+    text-align: center;
+  }
+  .rpt-toast.show { opacity: 1; }
 
 `;
 
@@ -374,7 +531,8 @@ function pickFmt(key, val) {
   let v = val;
   let cls = "";
 
-  if (key === "uptime") return { value: fmtUptime(parseFloat(v)), unit: "", cls };
+  if (key === "uptime")
+    return { value: fmtUptime(parseFloat(v)), unit: "", cls };
   if (key === "battery_percentage") {
     const n = parseFloat(v);
     cls = n <= 15 ? "danger" : n <= 30 ? "warn" : "";
@@ -411,15 +569,20 @@ class MeshcoreRepeaterCard extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this._hass = null;
     this._config = {};
-    this._repeaters = [];          // [{pubkey10, name, online, sensorEntries:{key:entity_id}, online_entity}]
+    this._repeaters = []; // [{pubkey10, name, online, sensorEntries:{key:entity_id}, online_entity}]
     this._selectedPubkey = null;
-    this._history = {};            // { entity_id: [{ts, v}] }
+    this._history = {}; // { entity_id: [{ts, v}] }
     this._historyLoadedFor = null; // pubkey10 we loaded for
     this._historyInProgress = false;
     this._refreshTimer = null;
     this._consoleLog = [];
-    this._consoleOpen = false;
+    this._activeTab = "info";
     this._consoleUnsub = null;
+    this._consoleHistory = [];
+    this._historyIdx = -1;
+    this._pendingGet = null;
+    this._pendingToast = false;
+    this._toastTimer = null;
   }
 
   setConfig(config) {
@@ -427,13 +590,19 @@ class MeshcoreRepeaterCard extends HTMLElement {
       repeater: config?.repeater || null,
       title: config?.title || "",
       hours: Math.max(1, Math.min(720, Number(config?.hours) || 24)),
-      charts: Array.isArray(config?.charts) && config.charts.length
-        ? config.charts.slice() : DEFAULT_CHART_KEYS.slice(),
-      stats: Array.isArray(config?.stats) && config.stats.length
-        ? config.stats.slice() : DEFAULT_STAT_KEYS.slice(),
+      charts:
+        Array.isArray(config?.charts) && config.charts.length
+          ? config.charts.slice()
+          : DEFAULT_CHART_KEYS.slice(),
+      stats:
+        Array.isArray(config?.stats) && config.stats.length
+          ? config.stats.slice()
+          : DEFAULT_STAT_KEYS.slice(),
       entry_id: config?.entry_id || null,
+      login_password: config?.login_password ?? "",
     };
-    if (this._config.repeater) this._selectedPubkey = String(this._config.repeater).toLowerCase();
+    if (this._config.repeater)
+      this._selectedPubkey = String(this._config.repeater).toLowerCase();
     this._render();
   }
 
@@ -444,7 +613,10 @@ class MeshcoreRepeaterCard extends HTMLElement {
     if (first) {
       this._render();
       // Refresh history every 5 minutes; live values come from hass.states.
-      this._refreshTimer = setInterval(() => this._loadHistory(true), 5 * 60 * 1000);
+      this._refreshTimer = setInterval(
+        () => this._loadHistory(true),
+        5 * 60 * 1000,
+      );
       // Defer history fetch slightly to let the rest of the dashboard load.
       setTimeout(() => this._loadHistory(false), 200);
       this._subscribeConsole();
@@ -456,8 +628,18 @@ class MeshcoreRepeaterCard extends HTMLElement {
   }
 
   disconnectedCallback() {
-    if (this._refreshTimer) { clearInterval(this._refreshTimer); this._refreshTimer = null; }
-    if (this._consoleUnsub) { this._consoleUnsub(); this._consoleUnsub = null; }
+    if (this._refreshTimer) {
+      clearInterval(this._refreshTimer);
+      this._refreshTimer = null;
+    }
+    if (this._consoleUnsub) {
+      this._consoleUnsub();
+      this._consoleUnsub = null;
+    }
+    if (this._toastTimer) {
+      clearTimeout(this._toastTimer);
+      this._toastTimer = null;
+    }
   }
 
   // ── Discovery ─────────────────────────────────────────────────────
@@ -469,7 +651,8 @@ class MeshcoreRepeaterCard extends HTMLElement {
     const states = this._hass.states;
     const groups = new Map(); // pubkey10 → { sensorEntries:{key:eid}, name }
 
-    const re = /^sensor\.meshcore_([a-f0-9]{10})_([a-z0-9_]+?)(?:_([a-z0-9_]+))?$/i;
+    const re =
+      /^sensor\.meshcore_([a-f0-9]{10})_([a-z0-9_]+?)(?:_([a-z0-9_]+))?$/i;
     for (const id of Object.keys(states)) {
       const m = id.match(re);
       if (!m) continue;
@@ -481,18 +664,29 @@ class MeshcoreRepeaterCard extends HTMLElement {
       if (!statKey) continue;
       let entry = groups.get(pubkey10);
       if (!entry) {
-        entry = { pubkey10, sensorEntries: {}, name: "", online: null, online_entity: null };
+        entry = {
+          pubkey10,
+          sensorEntries: {},
+          name: "",
+          online: null,
+          online_entity: null,
+        };
         groups.set(pubkey10, entry);
       }
       // Prefer the canonical entity_id (longest match) per stat key.
-      if (!entry.sensorEntries[statKey] || id.length > entry.sensorEntries[statKey].length) {
+      if (
+        !entry.sensorEntries[statKey] ||
+        id.length > entry.sensorEntries[statKey].length
+      ) {
         entry.sensorEntries[statKey] = id;
       }
       // Pull the repeater name from the friendly_name's device prefix
       // ("MeshCore Repeater: NAME (xxxxxx) <Stat>") or from the device
       // registry attribute, falling back to a humanised stat suffix.
       const fn = states[id]?.attributes?.friendly_name || "";
-      const nameMatch = fn.match(/MeshCore Repeater:\s*(.+?)\s*\([a-f0-9]{1,12}\)/i);
+      const nameMatch = fn.match(
+        /MeshCore Repeater:\s*(.+?)\s*\([a-f0-9]{1,12}\)/i,
+      );
       if (nameMatch) entry.name = nameMatch[1].trim();
     }
 
@@ -509,8 +703,8 @@ class MeshcoreRepeaterCard extends HTMLElement {
 
     // Build sorted list (online first, then by name).
     const list = Array.from(groups.values())
-      .filter(g => Object.keys(g.sensorEntries).length > 0)
-      .map(g => ({
+      .filter((g) => Object.keys(g.sensorEntries).length > 0)
+      .map((g) => ({
         ...g,
         name: g.name || `Repeater ${g.pubkey10.slice(0, 6)}`,
       }))
@@ -525,13 +719,14 @@ class MeshcoreRepeaterCard extends HTMLElement {
     if (this._selectedPubkey) {
       // Allow selecting by pubkey prefix OR by friendly name match.
       const want = this._selectedPubkey;
-      const found = list.find(r =>
-        r.pubkey10.startsWith(want) ||
-        want.startsWith(r.pubkey10) ||
-        r.name.toLowerCase() === want.toLowerCase()
+      const found = list.find(
+        (r) =>
+          r.pubkey10.startsWith(want) ||
+          want.startsWith(r.pubkey10) ||
+          r.name.toLowerCase() === want.toLowerCase(),
       );
       if (found) this._selectedPubkey = found.pubkey10;
-      else if (!list.find(r => r.pubkey10 === this._selectedPubkey)) {
+      else if (!list.find((r) => r.pubkey10 === this._selectedPubkey)) {
         this._selectedPubkey = list[0]?.pubkey10 || null;
       }
     } else if (list.length) {
@@ -555,7 +750,9 @@ class MeshcoreRepeaterCard extends HTMLElement {
 
   _selected() {
     if (!this._selectedPubkey) return null;
-    return this._repeaters.find(r => r.pubkey10 === this._selectedPubkey) || null;
+    return (
+      this._repeaters.find((r) => r.pubkey10 === this._selectedPubkey) || null
+    );
   }
 
   // ── History ───────────────────────────────────────────────────────
@@ -567,7 +764,7 @@ class MeshcoreRepeaterCard extends HTMLElement {
     this._historyInProgress = true;
 
     const entityIds = this._config.charts
-      .map(k => r.sensorEntries[k])
+      .map((k) => r.sensorEntries[k])
       .filter(Boolean);
     if (!entityIds.length) {
       this._historyInProgress = false;
@@ -575,7 +772,9 @@ class MeshcoreRepeaterCard extends HTMLElement {
       return;
     }
 
-    const start = new Date(Date.now() - this._config.hours * 3600 * 1000).toISOString();
+    const start = new Date(
+      Date.now() - this._config.hours * 3600 * 1000,
+    ).toISOString();
     try {
       // history/history_during_period: returns
       //   { "<entity_id>": [{s: state, lu: epoch_seconds}, ...] }
@@ -591,13 +790,19 @@ class MeshcoreRepeaterCard extends HTMLElement {
       const next = {};
       for (const eid of entityIds) {
         const series = resp?.[eid];
-        if (!Array.isArray(series)) { next[eid] = []; continue; }
+        if (!Array.isArray(series)) {
+          next[eid] = [];
+          continue;
+        }
         const points = [];
         for (const p of series) {
           const v = p.s ?? p.state;
-          const ts = (p.lu ?? p.last_updated_ts) * 1000 || Date.parse(p.last_updated || "");
+          const ts =
+            (p.lu ?? p.last_updated_ts) * 1000 ||
+            Date.parse(p.last_updated || "");
           if (!isFinite(ts)) continue;
-          if (v == null || v === "" || v === "unavailable" || v === "unknown") continue;
+          if (v == null || v === "" || v === "unavailable" || v === "unknown")
+            continue;
           const num = parseFloat(v);
           if (!isFinite(num)) continue;
           points.push({ ts, v: num });
@@ -617,17 +822,47 @@ class MeshcoreRepeaterCard extends HTMLElement {
   // ── Render ────────────────────────────────────────────────────────
   _render() {
     const root = this.shadowRoot;
+    const t = this._activeTab;
     root.innerHTML = `<style>${STYLE}</style>
       <div class="card">
         <div class="header" id="hdr"></div>
-        <div class="stats" id="stats"></div>
-        <div id="neighbors"></div>
-        <div id="console"></div>
-        <div class="charts" id="charts"></div>
+        <div class="tabs" id="tabs">
+          <button class="tab-btn${t === "info" ? " active" : ""}" data-tab="info">Information</button>
+          <button class="tab-btn${t === "settings" ? " active" : ""}" data-tab="settings">Settings</button>
+          <button class="tab-btn${t === "console" ? " active" : ""}" data-tab="console">Console</button>
+        </div>
+        <div class="tab-panel${t === "info" ? " active" : ""}" id="panel-info">
+          <div class="stats" id="stats"></div>
+          <div id="neighbors"></div>
+          <div class="charts" id="charts"></div>
+        </div>
+        <div class="tab-panel${t === "settings" ? " active" : ""}" id="panel-settings">
+          <div id="settings"></div>
+        </div>
+        <div class="tab-panel${t === "console" ? " active" : ""}" id="panel-console">
+          <div id="console"></div>
+        </div>
+        <div class="rpt-toast" id="rpt-toast"></div>
       </div>`;
+
+    root.getElementById("tabs").addEventListener("click", (e) => {
+      const btn = e.target.closest(".tab-btn");
+      if (!btn) return;
+      this._activeTab = btn.dataset.tab;
+      root.querySelectorAll(".tab-btn").forEach((b) =>
+        b.classList.toggle("active", b.dataset.tab === this._activeTab),
+      );
+      root.querySelectorAll(".tab-panel").forEach((p) =>
+        p.classList.toggle("active", p.id === `panel-${this._activeTab}`),
+      );
+      if (this._activeTab === "console")
+        setTimeout(() => root.getElementById("console-input")?.focus(), 50);
+    });
+
     this._renderHeader();
     this._renderStats();
     this._renderNeighborMap();
+    this._renderSettings();
     this._renderConsole();
     this._renderCharts();
   }
@@ -640,8 +875,10 @@ class MeshcoreRepeaterCard extends HTMLElement {
         Configure at least one repeater in the integration's
         <code>Configure → Tracked repeaters</code> dialog.</div>`;
       // Hide stats/charts containers
-      const stats = this.shadowRoot.getElementById("stats"); if (stats) stats.remove();
-      const charts = this.shadowRoot.getElementById("charts"); if (charts) charts.remove();
+      const stats = this.shadowRoot.getElementById("stats");
+      if (stats) stats.remove();
+      const charts = this.shadowRoot.getElementById("charts");
+      if (charts) charts.remove();
       return;
     }
     const r = this._selected();
@@ -649,13 +886,17 @@ class MeshcoreRepeaterCard extends HTMLElement {
     const initial = (r.name[0] || "?").toUpperCase();
     const onlineDot = `<div class="dot ${r.online ? "online" : ""}"></div>`;
     const title = this._config.title || r.name;
-    const selector = this._repeaters.length > 1
-      ? `<select class="selector" id="rep-select" title="Switch repeater">
-           ${this._repeaters.map(rr =>
-             `<option value="${rr.pubkey10}" ${rr.pubkey10 === r.pubkey10 ? "selected" : ""}>${esc(rr.name)} (${rr.pubkey10.slice(0,6)})</option>`
-           ).join("")}
+    const selector =
+      this._repeaters.length > 1
+        ? `<select class="selector" id="rep-select" title="Switch repeater">
+           ${this._repeaters
+             .map(
+               (rr) =>
+                 `<option value="${rr.pubkey10}" ${rr.pubkey10 === r.pubkey10 ? "selected" : ""}>${esc(rr.name)} (${rr.pubkey10.slice(0, 6)})</option>`,
+             )
+             .join("")}
          </select>`
-      : "";
+        : "";
     el.innerHTML = `
       <div class="icon">${esc(initial)}${onlineDot}</div>
       <div class="meta">
@@ -665,43 +906,50 @@ class MeshcoreRepeaterCard extends HTMLElement {
       ${selector}`;
 
     const sel = el.querySelector("#rep-select");
-    if (sel) sel.addEventListener("change", () => {
-      this._selectedPubkey = sel.value;
-      this._historyLoadedFor = null;
-      this._consoleLog = [];
-      this._renderHeader();
-      this._renderStats();
-      this._renderNeighborMap();
-      this._renderConsole();
-      this._renderCharts();
-      this._loadHistory(false);
-    });
+    if (sel)
+      sel.addEventListener("change", () => {
+        this._selectedPubkey = sel.value;
+        this._historyLoadedFor = null;
+        this._consoleLog = [];
+        this._renderHeader();
+        this._renderStats();
+        this._renderNeighborMap();
+        this._renderSettings();
+        this._renderConsole();
+        this._renderCharts();
+        this._loadHistory(false);
+      });
   }
 
   _renderStats() {
     const el = this.shadowRoot.getElementById("stats");
     if (!el) return;
     const r = this._selected();
-    if (!r) { el.innerHTML = ""; return; }
+    if (!r) {
+      el.innerHTML = "";
+      return;
+    }
 
-    const html = this._config.stats.map(key => {
-      const eid = r.sensorEntries[key];
-      const meta = STAT_META[key] || { label: key, unit: "" };
-      if (!eid) {
-        return `
+    const html = this._config.stats
+      .map((key) => {
+        const eid = r.sensorEntries[key];
+        const meta = STAT_META[key] || { label: key, unit: "" };
+        if (!eid) {
+          return `
           <div class="stat unavail">
             <div class="label">${meta.icon ? `<span>${meta.icon}</span>` : ""}${esc(meta.label)}</div>
             <div class="value">—</div>
           </div>`;
-      }
-      const st = this._hass?.states?.[eid];
-      const fmt = pickFmt(key, st?.state);
-      return `
+        }
+        const st = this._hass?.states?.[eid];
+        const fmt = pickFmt(key, st?.state);
+        return `
         <div class="stat ${fmt.cls}" title="${esc(eid)}">
           <div class="label">${meta.icon ? `<span>${meta.icon}</span>` : ""}${esc(meta.label)}</div>
           <div class="value">${esc(fmt.value)}${fmt.unit ? `<span class="unit">${esc(fmt.unit)}</span>` : ""}</div>
         </div>`;
-    }).join("");
+      })
+      .join("");
     el.innerHTML = html;
   }
 
@@ -718,7 +966,8 @@ class MeshcoreRepeaterCard extends HTMLElement {
       const seenSt = this._hass.states[`${id}_seen`];
       const seen48h = seenSt ? parseInt(seenSt.state, 10) : null;
       // Look up neighbor GPS from their contact binary_sensor.
-      let lat = null, lon = null;
+      let lat = null,
+        lon = null;
       if (neighborPk) {
         const prefix6 = neighborPk.slice(0, 6).toLowerCase();
         for (const [cid, cst] of Object.entries(this._hass.states)) {
@@ -737,16 +986,16 @@ class MeshcoreRepeaterCard extends HTMLElement {
         snr,
         lastSeen: st.attributes?.last_seen || "",
         seen48h: isNaN(seen48h) ? null : seen48h,
-        lat: (lat && lat !== 0) ? lat : null,
-        lon: (lon && lon !== 0) ? lon : null,
+        lat: lat && lat !== 0 ? lat : null,
+        lon: lon && lon !== 0 ? lon : null,
       });
     }
     return neighbors;
   }
 
   _snrColor(snr) {
-    if (snr >= 0)   return "#4ade80";
-    if (snr >= -5)  return "#a3e635";
+    if (snr >= 0) return "#4ade80";
+    if (snr >= -5) return "#a3e635";
     if (snr >= -12) return "#facc15";
     if (snr >= -20) return "#fb923c";
     return "#f87171";
@@ -765,7 +1014,10 @@ class MeshcoreRepeaterCard extends HTMLElement {
   async _renderNeighborMap() {
     const el = this.shadowRoot.getElementById("neighbors");
     if (!el) return;
-    if (!this._selectedPubkey || !this._hass?.states) { el.innerHTML = ""; return; }
+    if (!this._selectedPubkey || !this._hass?.states) {
+      el.innerHTML = "";
+      return;
+    }
 
     const neighbors = this._getNeighbors();
     if (!neighbors.length) {
@@ -777,21 +1029,29 @@ class MeshcoreRepeaterCard extends HTMLElement {
     const rep6 = this._selectedPubkey.slice(0, 6).toLowerCase();
     const selfEntityId = this._contactEntityFor(rep6);
     const selfSt = selfEntityId ? this._hass.states[selfEntityId] : null;
-    const selfLat = selfSt?.attributes?.latitude || selfSt?.attributes?.adv_lat || null;
-    const selfLon = selfSt?.attributes?.longitude || selfSt?.attributes?.adv_lon || null;
+    const selfLat =
+      selfSt?.attributes?.latitude || selfSt?.attributes?.adv_lat || null;
+    const selfLon =
+      selfSt?.attributes?.longitude || selfSt?.attributes?.adv_lon || null;
 
     // Build entity list and paths for ha-map.
     const entities = [];
     const paths = [];
-    if (selfEntityId) entities.push({ entity_id: selfEntityId, color: "#38bdf8" });
+    if (selfEntityId)
+      entities.push({ entity_id: selfEntityId, color: "#38bdf8" });
 
     for (const n of neighbors) {
       const color = this._snrColor(n.snr);
-      const nEntityId = n.pubkey ? this._contactEntityFor(n.pubkey.slice(0, 6).toLowerCase()) : null;
+      const nEntityId = n.pubkey
+        ? this._contactEntityFor(n.pubkey.slice(0, 6).toLowerCase())
+        : null;
       if (nEntityId) entities.push({ entity_id: nEntityId, color });
       if (selfLat && selfLon && n.lat && n.lon) {
         paths.push({
-          points: [{ latitude: selfLat, longitude: selfLon }, { latitude: n.lat, longitude: n.lon }],
+          points: [
+            { latitude: selfLat, longitude: selfLon },
+            { latitude: n.lat, longitude: n.lon },
+          ],
           color,
           radius: 2,
           line: true,
@@ -858,19 +1118,26 @@ class MeshcoreRepeaterCard extends HTMLElement {
     const el = this.shadowRoot.getElementById("charts");
     if (!el) return;
     const r = this._selected();
-    if (!r) { el.innerHTML = ""; return; }
+    if (!r) {
+      el.innerHTML = "";
+      return;
+    }
 
-    const cards = this._config.charts.map((key, idx) => {
-      const eid = r.sensorEntries[key];
-      const meta = STAT_META[key] || { label: key, unit: "" };
-      const live = eid ? this._hass?.states?.[eid]?.state : null;
-      const fmt = pickFmt(key, live);
-      const points = (eid && this._history[eid]) || [];
-      const svg = points.length >= 2 ? this._sparkline(points, key) : "";
-      const empty = points.length < 2;
-      return `
+    const cards = this._config.charts
+      .map((key, idx) => {
+        const eid = r.sensorEntries[key];
+        const meta = STAT_META[key] || { label: key, unit: "" };
+        const live = eid ? this._hass?.states?.[eid]?.state : null;
+        const fmt = pickFmt(key, live);
+        const points = (eid && this._history[eid]) || [];
+        const svg = points.length >= 2 ? this._sparkline(points, key) : "";
+        const empty = points.length < 2;
+        return `
         <div class="chart ${empty ? "empty" : ""}" data-chart-idx="${idx}">
-          ${empty ? `<div>No history yet for ${esc(meta.label.toLowerCase())}.</div>` : `
+          ${
+            empty
+              ? `<div>No history yet for ${esc(meta.label.toLowerCase())}.</div>`
+              : `
             <div class="head">
               <span class="label">${meta.icon ? `${meta.icon} ` : ""}${esc(meta.label)}</span>
               <span class="last" data-live>${esc(fmt.value)}${fmt.unit ? ` <small style="color:var(--text3)">${esc(fmt.unit)}</small>` : ""}</span>
@@ -880,9 +1147,11 @@ class MeshcoreRepeaterCard extends HTMLElement {
             <div class="axis">
               <span>−${this._config.hours}h</span>
               <span>now</span>
-            </div>`}
+            </div>`
+          }
         </div>`;
-    }).join("");
+      })
+      .join("");
     el.innerHTML = cards;
     this._wireChartHover(el, r);
   }
@@ -897,7 +1166,7 @@ class MeshcoreRepeaterCard extends HTMLElement {
       const meta = STAT_META[key] || { label: key, unit: "" };
       const now = Date.now();
       const xMin = now - this._config.hours * 3600 * 1000;
-      const pts = allPts.filter(p => p.ts >= xMin);
+      const pts = allPts.filter((p) => p.ts >= xMin);
       if (pts.length < 2) return;
 
       const svgEl = chartEl.querySelector("svg");
@@ -907,20 +1176,33 @@ class MeshcoreRepeaterCard extends HTMLElement {
       const dot = svgEl?.querySelector(".hd");
       if (!svgEl || !tip || !cursorLine || !dot) return;
 
-      const W = 240, H = 60, PAD = 4;
+      const W = 240,
+        H = 60,
+        PAD = 4;
       const xMax = now;
-      const ys = pts.map(p => p.v);
-      let yMin = Math.min(...ys), yMax = Math.max(...ys);
-      if (yMin === yMax) { yMin -= 1; yMax += 1; }
-      if (key === "battery_percentage") { yMin = Math.min(0, yMin); yMax = Math.max(100, yMax); }
-      const yScale = v => H - PAD - ((v - yMin) / (yMax - yMin)) * (H - 2 * PAD);
+      const ys = pts.map((p) => p.v);
+      let yMin = Math.min(...ys),
+        yMax = Math.max(...ys);
+      if (yMin === yMax) {
+        yMin -= 1;
+        yMax += 1;
+      }
+      if (key === "battery_percentage") {
+        yMin = Math.min(0, yMin);
+        yMax = Math.max(100, yMax);
+      }
+      const yScale = (v) =>
+        H - PAD - ((v - yMin) / (yMax - yMin)) * (H - 2 * PAD);
 
       // Store the live label text so we can restore it on mouseleave.
       const liveText = liveEl ? liveEl.innerHTML : "";
 
       svgEl.addEventListener("mousemove", (e) => {
         const rect = svgEl.getBoundingClientRect();
-        const xFrac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const xFrac = Math.max(
+          0,
+          Math.min(1, (e.clientX - rect.left) / rect.width),
+        );
         const ts = xMin + xFrac * (xMax - xMin);
 
         // Nearest point by timestamp.
@@ -928,21 +1210,33 @@ class MeshcoreRepeaterCard extends HTMLElement {
         let best = Math.abs(pts[0].ts - ts);
         for (const p of pts) {
           const d = Math.abs(p.ts - ts);
-          if (d < best) { best = d; nearest = p; }
+          if (d < best) {
+            best = d;
+            nearest = p;
+          }
         }
 
         // Update SVG cursor + dot.
         const svgX = (PAD + xFrac * (W - 2 * PAD)).toFixed(1);
         const svgY = yScale(nearest.v).toFixed(1);
-        cursorLine.setAttribute("x1", svgX); cursorLine.setAttribute("x2", svgX);
-        dot.setAttribute("cx", svgX); dot.setAttribute("cy", svgY);
-        cursorLine.style.display = ""; dot.style.display = "";
+        cursorLine.setAttribute("x1", svgX);
+        cursorLine.setAttribute("x2", svgX);
+        dot.setAttribute("cx", svgX);
+        dot.setAttribute("cy", svgY);
+        cursorLine.style.display = "";
+        dot.style.display = "";
 
         // Tooltip content.
         const fmt = pickFmt(key, nearest.v);
         const d = new Date(nearest.ts);
-        const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-        const dateStr = d.toLocaleDateString([], { month: "short", day: "numeric" });
+        const timeStr = d.toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const dateStr = d.toLocaleDateString([], {
+          month: "short",
+          day: "numeric",
+        });
         tip.innerHTML = `${esc(fmt.value)}${fmt.unit ? `<span style="color:var(--text3);margin-left:2px;font-size:10px">${esc(fmt.unit)}</span>` : ""}<span class="tip-time">${esc(dateStr)} ${esc(timeStr)}</span>`;
         tip.style.display = "block";
 
@@ -970,27 +1264,42 @@ class MeshcoreRepeaterCard extends HTMLElement {
   // Build a sparkline polyline + smooth fill underneath for a series of
   // {ts, v} points spanning the configured `hours` window.
   _sparkline(points, key) {
-    const W = 240, H = 60, PAD = 4;
+    const W = 240,
+      H = 60,
+      PAD = 4;
     const now = Date.now();
     const start = now - this._config.hours * 3600 * 1000;
     // Clamp to the visible window.
-    const pts = points.filter(p => p.ts >= start);
+    const pts = points.filter((p) => p.ts >= start);
     if (pts.length < 2) return "";
 
-    const xs = pts.map(p => p.ts);
-    const ys = pts.map(p => p.v);
-    const xMin = start, xMax = now;
-    let yMin = Math.min(...ys), yMax = Math.max(...ys);
+    const xs = pts.map((p) => p.ts);
+    const ys = pts.map((p) => p.v);
+    const xMin = start,
+      xMax = now;
+    let yMin = Math.min(...ys),
+      yMax = Math.max(...ys);
     // For series with no variance, pad ±1 so the line doesn't collapse.
-    if (yMin === yMax) { yMin -= 1; yMax += 1; }
+    if (yMin === yMax) {
+      yMin -= 1;
+      yMax += 1;
+    }
     // For percentages, lock to 0..100 for clearer interpretation.
-    if (key === "battery_percentage") { yMin = Math.min(0, yMin); yMax = Math.max(100, yMax); }
+    if (key === "battery_percentage") {
+      yMin = Math.min(0, yMin);
+      yMax = Math.max(100, yMax);
+    }
 
-    const xScale = (t) => PAD + ((t - xMin) / (xMax - xMin || 1)) * (W - 2 * PAD);
-    const yScale = (v) => H - PAD - ((v - yMin) / (yMax - yMin || 1)) * (H - 2 * PAD);
+    const xScale = (t) =>
+      PAD + ((t - xMin) / (xMax - xMin || 1)) * (W - 2 * PAD);
+    const yScale = (v) =>
+      H - PAD - ((v - yMin) / (yMax - yMin || 1)) * (H - 2 * PAD);
 
     const linePath = pts
-      .map((p, i) => `${i === 0 ? "M" : "L"}${xScale(p.ts).toFixed(1)},${yScale(p.v).toFixed(1)}`)
+      .map(
+        (p, i) =>
+          `${i === 0 ? "M" : "L"}${xScale(p.ts).toFixed(1)},${yScale(p.v).toFixed(1)}`,
+      )
       .join(" ");
     const areaPath = `${linePath} L${xScale(pts[pts.length - 1].ts).toFixed(1)},${H - PAD} L${xScale(pts[0].ts).toFixed(1)},${H - PAD} Z`;
 
@@ -1008,6 +1317,346 @@ class MeshcoreRepeaterCard extends HTMLElement {
         <line class="hc" x1="0" y1="${PAD}" x2="0" y2="${H - PAD}" stroke="var(--text3,#64748b)" stroke-width="1" stroke-dasharray="3 2" style="display:none" pointer-events="none"/>
         <circle class="hd" cx="0" cy="0" r="3" fill="${colour}" stroke="var(--bg,#161a1d)" stroke-width="1.5" style="display:none" pointer-events="none"/>
       </svg>`;
+  }
+
+  // ── Repeater Settings ─────────────────────────────────────────────
+
+  _renderSettings() {
+    const el = this.shadowRoot.getElementById("settings");
+    if (!el) return;
+
+    const QUICK = [
+      { label: "ver", cmd: "ver" },
+      { label: "clock", cmd: "clock" },
+      { label: "advert", cmd: "advert" },
+      { label: "neighbors", cmd: "neighbors" },
+      { label: "clear stats", cmd: "clear stats" },
+      { label: "clkreboot", cmd: "clkreboot", cls: "btn-warn" },
+      { label: "reboot", cmd: "reboot", cls: "btn-danger" },
+    ];
+
+    // Each setting: { key, label, cmd (set), get, type, placeholder, attrs[] }
+    // Radio group is special: apply all four via "set radio {freq},{bw},{sf},{cr}"
+    const SECTIONS = [
+      {
+        title: "Radio",
+        applyAll: {
+          label: "Apply Radio (requires reboot)",
+          cmd: "set radio",
+          keys: ["freq", "bw", "sf", "cr"],
+        },
+        settings: [
+          {
+            key: "freq",
+            label: "Frequency (MHz)",
+            get: "get radio",
+            type: "number",
+            placeholder: "869.525",
+            attrs: ["freq", "frequency", "lora_freq"],
+          },
+          {
+            key: "bw",
+            label: "Bandwidth (kHz)",
+            get: "get radio",
+            type: "number",
+            placeholder: "62.5",
+            attrs: ["bw", "bandwidth", "lora_bw"],
+          },
+          {
+            key: "sf",
+            label: "Spread Factor",
+            get: "get radio",
+            type: "number",
+            placeholder: "10",
+            attrs: ["sf", "spread_factor", "lora_sf"],
+          },
+          {
+            key: "cr",
+            label: "Coding Rate",
+            get: "get radio",
+            type: "number",
+            placeholder: "5",
+            attrs: ["cr", "coding_rate", "lora_cr"],
+          },
+          {
+            key: "tx",
+            label: "TX Power (dBm)",
+            cmd: "set tx",
+            get: "get tx",
+            type: "number",
+            placeholder: "20",
+            attrs: ["tx_power", "txpower", "tx_pwr", "tx"],
+          },
+        ],
+      },
+      {
+        title: "Identity",
+        settings: [
+          {
+            key: "name",
+            label: "Name",
+            cmd: "set name",
+            get: "get name",
+            type: "text",
+            placeholder: "repeater name",
+            attrs: ["adv_name", "name"],
+          },
+          {
+            key: "lat",
+            label: "Latitude",
+            cmd: "set lat",
+            get: "get lat",
+            type: "text",
+            placeholder: "0.000000",
+            attrs: ["lat", "latitude", "adv_lat"],
+          },
+          {
+            key: "lon",
+            label: "Longitude",
+            cmd: "set lon",
+            get: "get lon",
+            type: "text",
+            placeholder: "0.000000",
+            attrs: ["lon", "longitude", "adv_lon"],
+          },
+          {
+            key: "owner.info",
+            label: "Owner Info",
+            cmd: "set owner.info",
+            get: "get owner.info",
+            type: "text",
+            placeholder: "owner info text",
+            attrs: ["owner_info"],
+          },
+        ],
+      },
+      {
+        title: "Repeater Behavior",
+        settings: [
+          {
+            key: "flood.max",
+            label: "Flood Max Hops",
+            cmd: "set flood.max",
+            get: "get flood.max",
+            type: "number",
+            placeholder: "3",
+            attrs: ["flood_max"],
+          },
+          {
+            key: "af",
+            label: "Air-time Factor",
+            cmd: "set af",
+            get: "get af",
+            type: "number",
+            placeholder: "1",
+            attrs: ["af", "air_time_factor"],
+          },
+          {
+            key: "advert.interval",
+            label: "Advert Interval (min)",
+            cmd: "set advert.interval",
+            get: "get advert.interval",
+            type: "number",
+            placeholder: "0",
+            attrs: ["advert_interval"],
+          },
+          {
+            key: "flood.advert.interval",
+            label: "Flood Advert (hours)",
+            cmd: "set flood.advert.interval",
+            get: "get flood.advert.interval",
+            type: "number",
+            placeholder: "0",
+            attrs: ["flood_advert_interval"],
+          },
+          {
+            key: "repeat",
+            label: "Repeater Role",
+            cmd: "set repeat",
+            get: "get repeat",
+            type: "text",
+            placeholder: "on|off",
+            attrs: ["repeat"],
+          },
+          {
+            key: "int.thresh",
+            label: "Interf. Threshold (dB)",
+            cmd: "set int.thresh",
+            get: "get int.thresh",
+            type: "number",
+            placeholder: "14",
+            attrs: ["int_thresh"],
+          },
+          {
+            key: "agc.reset.interval",
+            label: "AGC Reset (seconds)",
+            cmd: "set agc.reset.interval",
+            get: "get agc.reset.interval",
+            type: "number",
+            placeholder: "0",
+            attrs: ["agc_reset_interval"],
+          },
+          {
+            key: "multi.acks",
+            label: "Multi ACKs",
+            cmd: "set multi.acks",
+            get: "get multi.acks",
+            type: "number",
+            placeholder: "0|1",
+            attrs: ["multi_acks"],
+          },
+          {
+            key: "txdelay",
+            label: "TX Delay Factor",
+            cmd: "set txdelay",
+            get: "get txdelay",
+            type: "number",
+            placeholder: "0",
+            attrs: ["txdelay"],
+          },
+          {
+            key: "rxdelay",
+            label: "RX Delay Base",
+            cmd: "set rxdelay",
+            get: "get rxdelay",
+            type: "number",
+            placeholder: "0",
+            attrs: ["rxdelay"],
+          },
+          {
+            key: "direct.txdelay",
+            label: "Direct TX Delay",
+            cmd: "set direct.txdelay",
+            get: "get direct.txdelay",
+            type: "number",
+            placeholder: "0",
+            attrs: ["direct_txdelay"],
+          },
+        ],
+      },
+      {
+        title: "Security",
+        settings: [
+          {
+            key: "guest.password",
+            label: "Guest Password",
+            cmd: "set guest.password",
+            type: "password",
+            placeholder: "(set new)",
+            attrs: [],
+          },
+          {
+            key: "allow.read.only",
+            label: "Allow Read-only",
+            cmd: "set allow.read.only",
+            get: "get allow.read.only",
+            type: "text",
+            placeholder: "on|off",
+            attrs: [],
+          },
+        ],
+      },
+    ];
+
+    const r = this._selected();
+    const sensorAttrs = r?.online_entity
+      ? this._hass?.states?.[r.online_entity]?.attributes || {}
+      : {};
+
+    // Flatten settings for index lookup.
+    const allSettings = SECTIONS.flatMap((s) => s.settings);
+
+    // Build get-command → [keys] map so clicking "get radio" populates all 4 radio fields.
+    const getMap = {};
+    for (const s of allSettings) {
+      if (!s.get) continue;
+      (getMap[s.get] = getMap[s.get] || []).push(s.key);
+    }
+
+    const quickHtml = QUICK.map(
+      (q) =>
+        `<button class="${q.cls || ""}" data-cmd="${esc(q.cmd)}">${esc(q.label)}</button>`,
+    ).join("");
+
+    const sectionsHtml = SECTIONS.map((sec) => {
+      const rowsHtml = sec.settings
+        .map((s) => {
+          const idx = allSettings.indexOf(s);
+          const current = (s.attrs || []).reduce(
+            (v, a) => (v !== "" ? v : (sensorAttrs[a] ?? "")),
+            "",
+          );
+          const getKeys = s.get ? (getMap[s.get] || [s.key]).join(",") : "";
+          const getBtn = s.get
+            ? `<button class="btn-get" data-getcmd="${esc(s.get)}" data-getkeys="${esc(getKeys)}" title="Read current value from device">get</button>`
+            : "";
+          const applyBtn = s.cmd
+            ? `<button data-apply-idx="${idx}">Apply</button>`
+            : "";
+          return `<div class="rpt-row">
+          <span class="rpt-label">${esc(s.label)}</span>
+          ${getBtn}
+          <input type="${s.type}" data-setting-key="${esc(s.key)}" data-setting-idx="${idx}"
+            value="${esc(String(current))}" placeholder="${esc(s.placeholder)}" autocomplete="off"/>
+          ${applyBtn}
+        </div>`;
+        })
+        .join("");
+
+      const applyAllBtn = sec.applyAll
+        ? `<div class="rpt-row">
+          <button class="rpt-apply-all" data-apply-all="${esc(sec.applyAll.cmd)}"
+            data-keys="${esc(sec.applyAll.keys.join(","))}">${esc(sec.applyAll.label)}</button>
+        </div>`
+        : "";
+
+      return `<div class="rpt-section-head">${esc(sec.title)}</div>${rowsHtml}${applyAllBtn}`;
+    }).join("");
+
+    el.innerHTML = `
+      <div class="rpt-actions">${quickHtml}</div>
+      <div class="rpt-form">${sectionsHtml}</div>`;
+
+    el.querySelectorAll(".rpt-actions button[data-cmd]").forEach((btn) =>
+      btn.addEventListener("click", () =>
+        this._execConsoleCmd(btn.dataset.cmd, null, true),
+      ),
+    );
+    el.querySelectorAll("button[data-getcmd]").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        const keys = btn.dataset.getkeys ? btn.dataset.getkeys.split(",") : [];
+        this._execConsoleCmd(btn.dataset.getcmd, keys.length ? keys : null);
+      }),
+    );
+    el.querySelectorAll("button[data-apply-idx]").forEach((btn) => {
+      const s = allSettings[parseInt(btn.dataset.applyIdx, 10)];
+      btn.addEventListener("click", () => {
+        const input = el.querySelector(`input[data-setting-key="${s.key}"]`);
+        const val = input?.value.trim();
+        if (val) this._execConsoleCmd(`${s.cmd} ${val}`);
+      });
+    });
+    el.querySelectorAll("button[data-apply-all]").forEach((btn) => {
+      const cmd = btn.dataset.applyAll;
+      const keys = btn.dataset.keys.split(",");
+      btn.addEventListener("click", () => {
+        const vals = keys.map(
+          (k) =>
+            el.querySelector(`input[data-setting-key="${k}"]`)?.value.trim() ||
+            "",
+        );
+        if (vals.every((v) => v))
+          this._execConsoleCmd(`${cmd} ${vals.join(",")}`);
+      });
+    });
+    el.querySelectorAll("input[data-setting-idx]").forEach((input) => {
+      input.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        const s = allSettings[parseInt(input.dataset.settingIdx, 10)];
+        const val = input.value.trim();
+        if (s?.cmd && val) this._execConsoleCmd(`${s.cmd} ${val}`);
+      });
+    });
   }
 
   // ── CLI Console ───────────────────────────────────────────────────
@@ -1038,10 +1687,13 @@ class MeshcoreRepeaterCard extends HTMLElement {
     try {
       this._consoleUnsub = await this._hass.connection.subscribeEvents(
         (event) => this._onConsoleEvent(event),
-        "meshcore_message"
+        "meshcore_message",
       );
     } catch (err) {
-      console.warn("meshcore-repeater-card: console event subscription failed", err);
+      console.warn(
+        "meshcore-repeater-card: console event subscription failed",
+        err,
+      );
     }
   }
 
@@ -1053,11 +1705,47 @@ class MeshcoreRepeaterCard extends HTMLElement {
     const senderName = (d.sender_name || "").toLowerCase();
     const rName = r.name.toLowerCase();
     if (senderName !== rName) return;
-    this._consoleLog.push({ cls: "cl-recv", text: `← ${d.message || ""}` });
+    const msg = d.message || "";
+    this._consoleLog.push({ cls: "cl-recv", text: `← ${msg}` });
     this._appendConsoleLog();
+    if (this._pendingGet) {
+      const keys = this._pendingGet;
+      this._pendingGet = null;
+      this._populateSettingInputs(keys, msg);
+    }
+    if (this._pendingToast) {
+      this._pendingToast = false;
+      this._showToast(msg.replace(/^>\s*/, "").trim());
+    }
   }
 
-  async _execConsoleCmd(cmd) {
+  _showToast(msg) {
+    const el = this.shadowRoot.getElementById("rpt-toast");
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => el.classList.remove("show"), 4000);
+  }
+
+  _populateSettingInputs(keys, response) {
+    const el = this.shadowRoot.getElementById("settings");
+    if (!el) return;
+    const trimmed = response.trim().replace(/^>\s*/, "");
+    if (keys.length === 1) {
+      const input = el.querySelector(`input[data-setting-key="${keys[0]}"]`);
+      if (input) input.value = trimmed;
+    } else {
+      // Multi-value response (e.g. "get radio" → "869525000,250,10,5")
+      const parts = trimmed.split(",").map((p) => p.trim());
+      keys.forEach((key, i) => {
+        const input = el.querySelector(`input[data-setting-key="${key}"]`);
+        if (input) input.value = parts[i] ?? "";
+      });
+    }
+  }
+
+  async _execConsoleCmd(cmd, pendingGetKeys = null, showToast = false) {
     if (!cmd.trim()) return;
     const r = this._selected();
     const entryId = await this._resolveEntryId();
@@ -1067,23 +1755,42 @@ class MeshcoreRepeaterCard extends HTMLElement {
       return;
     }
     if (!entryId) {
-      this._consoleLog.push({ cls: "cl-err", text: "entry_id unknown — add entry_id: <id> to card config." });
+      this._consoleLog.push({
+        cls: "cl-err",
+        text: "entry_id unknown — add entry_id: <id> to card config.",
+      });
       this._appendConsoleLog();
       return;
     }
+    // Push to history (skip consecutive duplicate, cap at 50).
+    if (this._consoleHistory[this._consoleHistory.length - 1] !== cmd) {
+      this._consoleHistory.push(cmd);
+      if (this._consoleHistory.length > 50) this._consoleHistory.shift();
+    }
+    this._historyIdx = -1;
+
     this._consoleLog.push({ cls: "cl-sent", text: `→ ${cmd}` });
     this._appendConsoleLog();
     try {
       await this._hass.callService("meshcore", "execute_command", {
         entry_id: entryId,
-        command: `send_login "${r.name}"`,
+        command: `send_login_sync "${r.name}" "${this._config.login_password ?? ""}"`,
       });
+      // Set response handlers only after login completes so the login
+      // response doesn't consume them before the command response arrives.
+      if (pendingGetKeys) this._pendingGet = pendingGetKeys;
+      if (showToast) this._pendingToast = true;
       await this._hass.callService("meshcore", "execute_command", {
         entry_id: entryId,
         command: `send_cmd "${r.name}" "${cmd}"`,
       });
     } catch (err) {
-      this._consoleLog.push({ cls: "cl-err", text: `Error: ${err?.message || String(err)}` });
+      this._pendingGet = null;
+      this._pendingToast = false;
+      this._consoleLog.push({
+        cls: "cl-err",
+        text: `Error: ${err?.message || String(err)}`,
+      });
       this._appendConsoleLog();
     }
   }
@@ -1091,27 +1798,24 @@ class MeshcoreRepeaterCard extends HTMLElement {
   _renderConsole() {
     const el = this.shadowRoot.getElementById("console");
     if (!el) return;
-    const logHtml = this._consoleLog.map(e =>
-      `<div class="${esc(e.cls)}">${esc(e.text)}</div>`
-    ).join("");
-    el.innerHTML = `
-      <div class="console-wrap">
-        <div class="console-title" id="console-toggle">
-          CLI Console
-          <span class="toggle">${this._consoleOpen ? "▲" : "▼"}</span>
-        </div>
-        <div class="console-body${this._consoleOpen ? " open" : ""}">
-          <div class="console-log" id="console-log">${logHtml}</div>
-          <div class="console-input">
-            <input type="text" id="console-input" placeholder="ver / reboot / clkreboot ..." autocomplete="off" spellcheck="false"/>
-            <button id="console-send">Send</button>
+    const logHtml = this._consoleLog.length
+      ? this._consoleLog.map((e) => `<div class="${esc(e.cls)}">${esc(e.text)}</div>`).join("")
+      : `<div class="cl-help">
+          <div class="cl-help-title">CLI Console</div>
+          <div class="cl-help-desc">Send commands directly to the repeater. Type a command below or use one of the quick-action buttons in the Settings tab.</div>
+          <div class="cl-help-cmds">
+            <span>ver</span><span>clock</span><span>advert</span><span>neighbors</span>
+            <span>get radio</span><span>get name</span><span>get tx</span>
+            <span>reboot</span><span>clkreboot</span>
           </div>
-        </div>
+          <div class="cl-help-desc" style="margin-top:8px">Use ↑ ↓ arrow keys to navigate command history.</div>
+        </div>`;
+    el.innerHTML = `
+      <div class="console-log" id="console-log">${logHtml}</div>
+      <div class="console-input">
+        <input type="text" id="console-input" placeholder="ver / reboot / clkreboot ..." autocomplete="off" spellcheck="false"/>
+        <button id="console-send">Send</button>
       </div>`;
-    el.querySelector("#console-toggle").addEventListener("click", () => {
-      this._consoleOpen = !this._consoleOpen;
-      this._renderConsole();
-    });
     const input = el.querySelector("#console-input");
     const send = el.querySelector("#console-send");
     const logEl = el.querySelector("#console-log");
@@ -1120,12 +1824,41 @@ class MeshcoreRepeaterCard extends HTMLElement {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         const cmd = input.value.trim();
-        if (cmd) { input.value = ""; this._execConsoleCmd(cmd); }
+        if (cmd) {
+          input.value = "";
+          this._historyIdx = -1;
+          this._execConsoleCmd(cmd);
+        }
+        return;
+      }
+      const hist = this._consoleHistory;
+      if (e.key === "ArrowUp" && hist.length) {
+        e.preventDefault();
+        this._historyIdx =
+          this._historyIdx < 0
+            ? hist.length - 1
+            : Math.max(0, this._historyIdx - 1);
+        input.value = hist[this._historyIdx];
+        input.setSelectionRange(input.value.length, input.value.length);
+        return;
+      }
+      if (e.key === "ArrowDown" && hist.length) {
+        e.preventDefault();
+        if (this._historyIdx < 0) return;
+        this._historyIdx++;
+        if (this._historyIdx >= hist.length) {
+          this._historyIdx = -1;
+          input.value = "";
+        } else input.value = hist[this._historyIdx];
+        input.setSelectionRange(input.value.length, input.value.length);
       }
     });
     send.addEventListener("click", () => {
       const cmd = input.value.trim();
-      if (cmd) { input.value = ""; this._execConsoleCmd(cmd); }
+      if (cmd) {
+        input.value = "";
+        this._execConsoleCmd(cmd);
+      }
     });
   }
 
@@ -1143,13 +1876,18 @@ class MeshcoreRepeaterCard extends HTMLElement {
     }
   }
 
-  getCardSize() { return 5; }
-  static getConfigElement() { return document.createElement("meshcore-repeater-card-editor"); }
-  static getStubConfig() { return {}; }
+  getCardSize() {
+    return 5;
+  }
+  static getConfigElement() {
+    return document.createElement("meshcore-repeater-card-editor");
+  }
+  static getStubConfig() {
+    return {};
+  }
 }
 
 customElements.define("meshcore-repeater-card", MeshcoreRepeaterCard);
-
 
 /* ───────────────────────── Visual editor ───────────────────────── */
 
@@ -1198,7 +1936,11 @@ class MeshcoreRepeaterCardEditor extends HTMLElement {
     this._discovered = [];
   }
 
-  set hass(hass) { this._hass = hass; this._discover(); this._render(); }
+  set hass(hass) {
+    this._hass = hass;
+    this._discover();
+    this._render();
+  }
 
   setConfig(config) {
     // Preserve `type` and any other top-level keys we don't manage so the
@@ -1209,9 +1951,14 @@ class MeshcoreRepeaterCardEditor extends HTMLElement {
       repeater: config?.repeater || "",
       title: config?.title || "",
       hours: Number(config?.hours) || 24,
-      charts: Array.isArray(config?.charts) ? config.charts.slice() : DEFAULT_CHART_KEYS.slice(),
-      stats: Array.isArray(config?.stats) ? config.stats.slice() : DEFAULT_STAT_KEYS.slice(),
+      charts: Array.isArray(config?.charts)
+        ? config.charts.slice()
+        : DEFAULT_CHART_KEYS.slice(),
+      stats: Array.isArray(config?.stats)
+        ? config.stats.slice()
+        : DEFAULT_STAT_KEYS.slice(),
       entry_id: config?.entry_id || "",
+      login_password: config?.login_password ?? "",
     };
     if (!this._emitting) this._render();
   }
@@ -1226,9 +1973,13 @@ class MeshcoreRepeaterCardEditor extends HTMLElement {
       const pk = m[1].toLowerCase();
       const fn = this._hass.states[id]?.attributes?.friendly_name || "";
       const nm = fn.match(/MeshCore Repeater:\s*(.+?)\s*\(/i);
-      if (!seen.has(pk)) seen.set(pk, nm ? nm[1].trim() : `Repeater ${pk.slice(0,6)}`);
+      if (!seen.has(pk))
+        seen.set(pk, nm ? nm[1].trim() : `Repeater ${pk.slice(0, 6)}`);
     }
-    this._discovered = Array.from(seen.entries()).map(([pubkey10, name]) => ({ pubkey10, name }));
+    this._discovered = Array.from(seen.entries()).map(([pubkey10, name]) => ({
+      pubkey10,
+      name,
+    }));
     this._discovered.sort((a, b) => a.name.localeCompare(b.name));
   }
 
@@ -1237,24 +1988,41 @@ class MeshcoreRepeaterCardEditor extends HTMLElement {
     // top-level keys (view_layout, visibility, card_mod overrides …) the
     // Lovelace round-trip expects. Then layer our managed fields on top.
     const out = { ...(this._originalConfig || {}) };
-    out.type = (this._originalConfig && this._originalConfig.type) || "custom:meshcore-repeater-card";
+    out.type =
+      (this._originalConfig && this._originalConfig.type) ||
+      "custom:meshcore-repeater-card";
 
     // Reset the keys we manage (so removing a value clears the YAML field).
-    delete out.repeater; delete out.title; delete out.hours;
-    delete out.stats; delete out.charts; delete out.entry_id;
+    delete out.repeater;
+    delete out.title;
+    delete out.hours;
+    delete out.stats;
+    delete out.charts;
+    delete out.entry_id;
+    delete out.login_password;
 
-    if (this._config.repeater) out.repeater = String(this._config.repeater).toLowerCase();
+    if (this._config.repeater)
+      out.repeater = String(this._config.repeater).toLowerCase();
     if (this._config.title) out.title = this._config.title;
-    if (this._config.hours && this._config.hours !== 24) out.hours = Number(this._config.hours);
+    if (this._config.hours && this._config.hours !== 24)
+      out.hours = Number(this._config.hours);
     if (this._config.entry_id) out.entry_id = this._config.entry_id;
+    if (this._config.login_password)
+      out.login_password = this._config.login_password;
     const stats = (this._config.stats || []).filter(Boolean);
-    if (stats.length && stats.join(",") !== DEFAULT_STAT_KEYS.join(",")) out.stats = stats;
+    if (stats.length && stats.join(",") !== DEFAULT_STAT_KEYS.join(","))
+      out.stats = stats;
     const charts = (this._config.charts || []).filter(Boolean);
-    if (charts.length && charts.join(",") !== DEFAULT_CHART_KEYS.join(",")) out.charts = charts;
+    if (charts.length && charts.join(",") !== DEFAULT_CHART_KEYS.join(","))
+      out.charts = charts;
     this._emitting = true;
-    this.dispatchEvent(new CustomEvent("config-changed", {
-      detail: { config: out }, bubbles: true, composed: true,
-    }));
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config: out },
+        bubbles: true,
+        composed: true,
+      }),
+    );
     this._emitting = false;
   }
 
@@ -1265,28 +2033,42 @@ class MeshcoreRepeaterCardEditor extends HTMLElement {
     this._config.title = get("title")?.value || "";
     this._config.hours = Number(get("hours")?.value) || 24;
     this._config.entry_id = get("entry_id")?.value.trim() || "";
-    this._config.charts = Array.from(root.querySelectorAll('input[data-charts]:checked'))
-      .map(cb => cb.value);
-    this._config.stats = Array.from(root.querySelectorAll('input[data-stats]:checked'))
-      .map(cb => cb.value);
+    this._config.login_password = get("login_password")?.value ?? "";
+    this._config.charts = Array.from(
+      root.querySelectorAll("input[data-charts]:checked"),
+    ).map((cb) => cb.value);
+    this._config.stats = Array.from(
+      root.querySelectorAll("input[data-stats]:checked"),
+    ).map((cb) => cb.value);
   }
 
   _render() {
     const c = this._config;
     const repOptions = `
       <option value="">— auto-detect —</option>
-      ${this._discovered.map(r =>
-        `<option value="${r.pubkey10}" ${r.pubkey10 === c.repeater ? "selected" : ""}>${esc(r.name)} (${r.pubkey10.slice(0,6)})</option>`
-      ).join("")}`;
+      ${this._discovered
+        .map(
+          (r) =>
+            `<option value="${r.pubkey10}" ${r.pubkey10 === c.repeater ? "selected" : ""}>${esc(r.name)} (${r.pubkey10.slice(0, 6)})</option>`,
+        )
+        .join("")}`;
     const allKeys = Object.keys(STAT_META);
     const statSet = new Set(c.stats || []);
     const chartSet = new Set(c.charts || []);
-    const statChecks = allKeys.map(k => `
+    const statChecks = allKeys
+      .map(
+        (k) => `
       <label><input type="checkbox" data-stats value="${k}" ${statSet.has(k) ? "checked" : ""}/> ${esc(STAT_META[k].label)} <small style="color:var(--secondary-text-color)">${k}</small></label>
-    `).join("");
-    const chartChecks = allKeys.map(k => `
+    `,
+      )
+      .join("");
+    const chartChecks = allKeys
+      .map(
+        (k) => `
       <label><input type="checkbox" data-charts value="${k}" ${chartSet.has(k) ? "checked" : ""}/> ${esc(STAT_META[k].label)} <small style="color:var(--secondary-text-color)">${k}</small></label>
-    `).join("");
+    `,
+      )
+      .join("");
 
     this.shadowRoot.innerHTML = `
       <style>${EDITOR_STYLE}</style>
@@ -1310,8 +2092,11 @@ class MeshcoreRepeaterCardEditor extends HTMLElement {
           <label>Entry ID (optional)
             <input type="text" name="entry_id" value="${esc(c.entry_id || "")}" placeholder="auto-detected"/>
           </label>
+          <label>Login Password
+            <input type="password" name="login_password" value="${esc(c.login_password || "")}" placeholder="leave blank if none"/>
+          </label>
         </div>
-        <div class="help">Only needed if auto-detection fails. Find it in Settings → Devices &amp; services → MeshCore → open the integration → copy the ID from the URL.</div>
+        <div class="help">Entry ID only needed if auto-detection fails. Password is the admin password set on the repeater (blank = no password).</div>
 
         <h4>Stat tiles</h4>
         <div class="checks">${statChecks}</div>
@@ -1321,16 +2106,21 @@ class MeshcoreRepeaterCardEditor extends HTMLElement {
       </div>`;
 
     const root = this.shadowRoot;
-    root.querySelectorAll("input, select").forEach(el => {
-      const ev = el.tagName === "SELECT" || el.type === "checkbox" ? "change" : "input";
-      el.addEventListener(ev, () => { this._capture(); this._emit(); });
+    root.querySelectorAll("input, select").forEach((el) => {
+      const ev =
+        el.tagName === "SELECT" || el.type === "checkbox" ? "change" : "input";
+      el.addEventListener(ev, () => {
+        this._capture();
+        this._emit();
+      });
     });
   }
-
 }
 
-customElements.define("meshcore-repeater-card-editor", MeshcoreRepeaterCardEditor);
-
+customElements.define(
+  "meshcore-repeater-card-editor",
+  MeshcoreRepeaterCardEditor,
+);
 
 // Register with HACS / Lovelace card picker.
 window.customCards = window.customCards || [];
