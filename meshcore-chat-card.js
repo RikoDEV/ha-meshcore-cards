@@ -1745,6 +1745,7 @@ class MeshcoreChatCard extends HTMLElement {
     this._nodeFilter = "all"; // nodes sub-filter: "all" | "clients" | "repeaters"
     this._search = "";
     this._unsubscribe = null;
+    this._connReadyHandler = null;
     this._sending = false;
     this._tickInterval = null;
     this._showAddChannel = false;
@@ -1962,11 +1963,13 @@ class MeshcoreChatCard extends HTMLElement {
   }
 
   disconnectedCallback() {
+    if (this._connReadyHandler && this._hass) {
+      this._hass.connection.removeEventListener("ready", this._connReadyHandler);
+      this._connReadyHandler = null;
+    }
     if (this._unsubscribers) {
       for (const u of this._unsubscribers) {
-        try {
-          u();
-        } catch (_) {}
+        try { Promise.resolve(u()).catch(() => {}); } catch (_) {}
       }
       this._unsubscribers = [];
     }
@@ -2380,10 +2383,16 @@ class MeshcoreChatCard extends HTMLElement {
   _subscribe() {
     if (!this._hass) return;
     this._unsubscribers = this._unsubscribers || [];
+
+    // Re-subscribe automatically when the WS connection reconnects.
+    // Only register once; _resubscribe clears stale unsubs then calls _subscribe again.
+    if (!this._connReadyHandler) {
+      this._connReadyHandler = () => this._resubscribe();
+      this._hass.connection.addEventListener("ready", this._connReadyHandler);
+    }
+
     this._hass.connection
-      .subscribeEvents((event) => {
-        this._handleEvent(event);
-      }, "meshcore_message")
+      .subscribeEvents((event) => this._handleEvent(event), "meshcore_message")
       .then((unsub) => {
         this._unsubscribe = unsub;
         this._unsubscribers.push(unsub);
@@ -2391,14 +2400,18 @@ class MeshcoreChatCard extends HTMLElement {
       .catch((err) =>
         console.warn("meshcore-chat-card: event subscription failed", err),
       );
-    // Progressive delivery updates for outgoing channel messages — fired
-    // every ~1s as repeater RX_LOG entries arrive (logbook.py:_collect_*).
     this._hass.connection
-      .subscribeEvents((event) => {
-        this._handleDeliveryUpdate(event);
-      }, "meshcore_delivery_update")
+      .subscribeEvents((event) => this._handleDeliveryUpdate(event), "meshcore_delivery_update")
       .then((unsub) => this._unsubscribers.push(unsub))
       .catch(() => {});
+  }
+
+  _resubscribe() {
+    // Server dropped all subscriptions on reconnect — clear the stale handles
+    // and re-subscribe so messages resume without a page refresh.
+    this._unsubscribers = [];
+    this._unsubscribe = null;
+    this._subscribe();
   }
 
   _handleEvent(event) {
