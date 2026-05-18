@@ -4456,12 +4456,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     this._deviceSettings = { ...this._deviceSettings, loading: true };
     if (this._settingsOpen && this._settingsTab === "device") this._renderSettingsModal();
 
-    const cmd = (c) => this._hass.callService("meshcore", "execute_command",
-      this._svcData({ command: c }), undefined, false, true);
-    const skip = Promise.resolve(null);
-
-    // Read HA entity state synchronously first — avoid sending commands for
-    // values the integration already exposes as sensors/attributes.
+    // Read values from HA entity states/attributes synchronously — no commands needed.
     const states = this._hass.states || {};
     const prefix = this._devicePrefix || this._config.device_prefix || this._settings.device_prefix;
     let attrFirmware = null, attrHardware = null, attrPublicKey = null;
@@ -4497,56 +4492,10 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       }
     }
 
-    const radioFromSensors = sensorFreq != null && sensorBw != null && sensorSf != null && sensorCr != null;
-
-    const [verR, boardR, pubkeyR, nameR, radioR, txR, rxgainR, dutycycleR, latR, lonR, phmR, rdR, entriesR, devicesR] =
-      await Promise.allSettled([
-        attrFirmware  ? skip : cmd("ver"),
-        attrHardware  ? skip : cmd("board"),
-        attrPublicKey ? skip : cmd("get public.key"),
-        cmd("get name"),
-        radioFromSensors ? skip : cmd("get radio"),
-        sensorTx   != null ? skip : cmd("get tx"),
-        cmd("get radio.rxgain"),
-        cmd("get dutycycle"),
-        sensorLat  != null ? skip : cmd("get lat"),
-        sensorLon  != null ? skip : cmd("get lon"),
-        cmd("get path.hash.mode"),
-        cmd("region default"),
-        this._hass.connection.sendMessagePromise({ type: "config_entries/get", domain: "meshcore" }),
-        this._hass.connection.sendMessagePromise({ type: "config/device_registry/list" }),
-      ]);
-
-    const out = (settled) => {
-      if (settled.status !== "fulfilled") return null;
-      const raw = settled.value?.response;
-      if (raw == null) return null;
-      if (typeof raw === "string") return raw.trim() || null;
-      // Try known output keys first, then any string value in the dict.
-      const known = raw.output ?? raw.response ?? raw.result ?? raw.message;
-      if (known != null) return String(known).trim() || null;
-      for (const v of Object.values(raw)) {
-        if (typeof v === "string" && v.trim()) return v.trim();
-      }
-      return null;
-    };
-    const num = (s) => { if (s == null) return null; const m = s.match(/-?[\d.]+/); return m ? parseFloat(m[0]) : null; };
-
-    // Parse radio from execute_command fallback: "freq,bw,sf,cr"
-    const radioStr = out(radioR);
-    let cmdFreq = null, cmdBw = null, cmdSf = null, cmdCr = null;
-    if (radioStr) {
-      const parts = radioStr.match(/[\d.]+/g) || [];
-      if (parts[0]) cmdFreq = parseFloat(parts[0]);
-      if (parts[1]) cmdBw   = parseFloat(parts[1]);
-      if (parts[2]) cmdSf   = parseInt(parts[2], 10);
-      if (parts[3]) cmdCr   = parseInt(parts[3], 10);
-    }
-    // Sensor state takes priority over execute_command output
-    const radioFreq = sensorFreq ?? cmdFreq ?? this._deviceSettings.radioFreq;
-    const radioBw   = sensorBw   ?? cmdBw   ?? this._deviceSettings.radioBw;
-    const radioSf   = sensorSf   ?? cmdSf   ?? this._deviceSettings.radioSf;
-    const radioCr   = sensorCr   ?? cmdCr   ?? this._deviceSettings.radioCr;
+    const [entriesR, devicesR] = await Promise.allSettled([
+      this._hass.connection.sendMessagePromise({ type: "config_entries/get", domain: "meshcore" }),
+      this._hass.connection.sendMessagePromise({ type: "config/device_registry/list" }),
+    ]);
 
     // Connection type from config entries
     let connectionType = this._deviceSettings.connectionType;
@@ -4566,21 +4515,6 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       }
     }
 
-    // Parse region: strip "null"/"<null>"
-    const rdStr = out(rdR);
-    const regionDefault = rdStr == null ? this._deviceSettings.regionDefault
-      : (rdStr === "null" || rdStr === "<null>" ? "" : rdStr);
-
-    // Path hash mode
-    const phmStr = out(phmR);
-    let pathHashMode = this._deviceSettings.pathHashMode;
-    if (phmStr != null) { const m = phmStr.match(/\d+/); if (m) pathHashMode = Math.min(2, Math.max(0, parseInt(m[0], 10))); }
-
-    // RX gain
-    const rxgainStr = out(rxgainR);
-    const rxGain = rxgainStr ? (rxgainStr.toLowerCase().includes("on") ? "on" : "off") : this._deviceSettings.rxGain;
-
-    // Strip "MeshCore " prefix and " (xxxxxx)" pubkey suffix added by the HA integration
     const cleanHaName = (s) => {
       if (!s) return null;
       return s.replace(/^meshcore\s+/i, "").replace(/\s*\([0-9a-f]{6,}\)\s*$/i, "").trim() || null;
@@ -4600,9 +4534,9 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         (!entryId && d.config_entries?.some?.((e) => meshcoreEntryIds.has(e)))
       );
       if (dev) {
-        regFirmware    = dev.sw_version ? String(dev.sw_version).trim() || null : null;
-        regHardware    = dev.model      ? String(dev.model).trim()      || null : null;
-        regDeviceName  = cleanHaName(String(dev.name_by_user ?? dev.name ?? ""));
+        regFirmware   = dev.sw_version ? String(dev.sw_version).trim() || null : null;
+        regHardware   = dev.model      ? String(dev.model).trim()      || null : null;
+        regDeviceName = cleanHaName(String(dev.name_by_user ?? dev.name ?? ""));
       }
     }
 
@@ -4617,7 +4551,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       return cleanHaName(entry?.title ? String(entry.title) : "");
     })();
 
-    // Friendly name from binary_sensor.meshcore_<prefix>_messages (strip " Messages")
+    // Friendly name from binary_sensor.meshcore_<prefix>_messages
     const sensorFriendlyName = (() => {
       if (!prefix) return null;
       const st = states[`binary_sensor.meshcore_${prefix}_messages`];
@@ -4627,19 +4561,22 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
 
     this._deviceSettings = {
       loading: false,
-      deviceName:    out(nameR) ?? regDeviceName ?? sensorFriendlyName ?? cfgEntryTitle ?? this._deviceSettings.deviceName,
-      firmware:      regFirmware ?? attrFirmware ?? out(verR)                ?? this._deviceSettings.firmware,
-      hardware:      regHardware ?? attrHardware ?? out(boardR)              ?? this._deviceSettings.hardware,
-      publicKey:     attrPublicKey ?? out(pubkeyR)                           ?? this._deviceSettings.publicKey,
+      deviceName:  regDeviceName ?? sensorFriendlyName ?? cfgEntryTitle ?? this._deviceSettings.deviceName,
+      firmware:    regFirmware ?? attrFirmware ?? this._deviceSettings.firmware,
+      hardware:    regHardware ?? attrHardware ?? this._deviceSettings.hardware,
+      publicKey:   attrPublicKey ?? this._deviceSettings.publicKey,
       connectionType,
-      radioFreq, radioBw, radioSf, radioCr,
-      txPower:    sensorTx  ?? num(out(txR))        ?? this._deviceSettings.txPower,
-      rxGain,
-      dutyCycle:  num(out(dutycycleR))              ?? this._deviceSettings.dutyCycle,
-      lat:        sensorLat ?? num(out(latR))       ?? this._deviceSettings.lat,
-      lon:        sensorLon ?? num(out(lonR))       ?? this._deviceSettings.lon,
-      pathHashMode,
-      regionDefault,
+      radioFreq:   sensorFreq ?? this._deviceSettings.radioFreq,
+      radioBw:     sensorBw   ?? this._deviceSettings.radioBw,
+      radioSf:     sensorSf   ?? this._deviceSettings.radioSf,
+      radioCr:     sensorCr   ?? this._deviceSettings.radioCr,
+      txPower:     sensorTx   ?? this._deviceSettings.txPower,
+      rxGain:      this._deviceSettings.rxGain,
+      dutyCycle:   this._deviceSettings.dutyCycle,
+      lat:         sensorLat  ?? this._deviceSettings.lat,
+      lon:         sensorLon  ?? this._deviceSettings.lon,
+      pathHashMode:  this._deviceSettings.pathHashMode,
+      regionDefault: this._deviceSettings.regionDefault,
     };
     if (this._settingsOpen && this._settingsTab === "device") this._renderSettingsModal();
   }
