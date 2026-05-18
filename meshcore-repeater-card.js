@@ -575,11 +575,21 @@ class MeshcoreRepeaterCard extends HTMLElement {
     this._historyLoadedFor = null; // pubkey10 we loaded for
     this._historyInProgress = false;
     this._refreshTimer = null;
-    this._consoleLog = [];
+    try {
+      const saved = sessionStorage.getItem("meshcore_rpt_console_log");
+      this._consoleLog = saved ? JSON.parse(saved) : [];
+    } catch {
+      this._consoleLog = [];
+    }
     this._activeTab = "info";
     this._consoleUnsub = null;
-    this._consoleHistory = [];
     this._historyIdx = -1;
+    try {
+      const saved = localStorage.getItem("meshcore_rpt_cmd_history");
+      this._consoleHistory = saved ? JSON.parse(saved) : [];
+    } catch {
+      this._consoleHistory = [];
+    }
     this._pendingGet = null;
     this._pendingToast = false;
     this._toastTimer = null;
@@ -911,6 +921,7 @@ class MeshcoreRepeaterCard extends HTMLElement {
         this._selectedPubkey = sel.value;
         this._historyLoadedFor = null;
         this._consoleLog = [];
+        try { sessionStorage.removeItem("meshcore_rpt_console_log"); } catch {}
         this._renderHeader();
         this._renderStats();
         this._renderNeighborMap();
@@ -1329,7 +1340,6 @@ class MeshcoreRepeaterCard extends HTMLElement {
       { label: "ver", cmd: "ver" },
       { label: "clock", cmd: "clock" },
       { label: "advert", cmd: "advert" },
-      { label: "neighbors", cmd: "neighbors" },
       { label: "clear stats", cmd: "clear stats" },
       { label: "clkreboot", cmd: "clkreboot", cls: "btn-warn" },
       { label: "reboot", cmd: "reboot", cls: "btn-danger" },
@@ -1766,6 +1776,7 @@ class MeshcoreRepeaterCard extends HTMLElement {
     if (this._consoleHistory[this._consoleHistory.length - 1] !== cmd) {
       this._consoleHistory.push(cmd);
       if (this._consoleHistory.length > 50) this._consoleHistory.shift();
+      try { localStorage.setItem("meshcore_rpt_cmd_history", JSON.stringify(this._consoleHistory)); } catch {}
     }
     this._historyIdx = -1;
 
@@ -1863,8 +1874,14 @@ class MeshcoreRepeaterCard extends HTMLElement {
   }
 
   _appendConsoleLog() {
+    try { sessionStorage.setItem("meshcore_rpt_console_log", JSON.stringify(this._consoleLog.slice(-200))); } catch {}
     const logEl = this.shadowRoot.getElementById("console-log");
     if (logEl) {
+      if (this._consoleLog.length === 1) {
+        // First entry — clear helper text and do a full render.
+        this._renderConsole();
+        return;
+      }
       const last = this._consoleLog[this._consoleLog.length - 1];
       const div = document.createElement("div");
       div.className = last.cls;
