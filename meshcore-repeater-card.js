@@ -35,6 +35,12 @@
  *     - last_snr
  *     - tx_queue_len
  *
+ *   entry_id: ""               # MeshCore config-entry ID — needed only for the
+ *                                 # CLI Console if auto-detection fails. Find it
+ *                                 # in Settings → Devices & services → MeshCore →
+ *                                 # click the integration → copy the ID from the
+ *                                 # URL: /config/integrations/integration/meshcore#<ID>
+ *
  * Visual editor: configurable through the Lovelace UI editor as
  * `meshcore-repeater-card`.
  */
@@ -278,6 +284,74 @@ const STYLE = `
     text-align: center; line-height: 1.6; background: var(--bg2);
   }
 
+  /* CLI console */
+  .console-wrap {
+    margin: 0 12px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .console-title {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--text3);
+    padding: 5px 10px 4px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+  }
+  .console-title .toggle { font-size: 12px; color: var(--text2); }
+  .console-body { display: none; }
+  .console-body.open { display: flex; flex-direction: column; }
+  .console-log {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    padding: 8px 10px;
+    background: var(--bg);
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .console-log .cl-sent { color: var(--text2); }
+  .console-log .cl-recv { color: var(--online, #4ade80); }
+  .console-log .cl-err  { color: var(--danger, #ef4444); }
+  .console-log .cl-info { color: var(--text3); }
+  .console-input {
+    display: flex;
+    border-top: 1px solid var(--border);
+    padding: 6px 8px;
+    gap: 6px;
+    background: var(--bg2);
+    align-items: center;
+  }
+  .console-input input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12px;
+    padding: 4px 8px;
+    outline: none;
+  }
+  .console-input input:focus { border-color: var(--accent); }
+  .console-input button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .console-input button:disabled { opacity: 0.5; cursor: default; }
+
 `;
 
 function fmtUptime(days) {
@@ -343,6 +417,9 @@ class MeshcoreRepeaterCard extends HTMLElement {
     this._historyLoadedFor = null; // pubkey10 we loaded for
     this._historyInProgress = false;
     this._refreshTimer = null;
+    this._consoleLog = [];
+    this._consoleOpen = false;
+    this._consoleUnsub = null;
   }
 
   setConfig(config) {
@@ -370,6 +447,7 @@ class MeshcoreRepeaterCard extends HTMLElement {
       this._refreshTimer = setInterval(() => this._loadHistory(true), 5 * 60 * 1000);
       // Defer history fetch slightly to let the rest of the dashboard load.
       setTimeout(() => this._loadHistory(false), 200);
+      this._subscribeConsole();
     } else {
       this._renderStats();
       this._renderHeader();
@@ -379,6 +457,7 @@ class MeshcoreRepeaterCard extends HTMLElement {
 
   disconnectedCallback() {
     if (this._refreshTimer) { clearInterval(this._refreshTimer); this._refreshTimer = null; }
+    if (this._consoleUnsub) { this._consoleUnsub(); this._consoleUnsub = null; }
   }
 
   // ── Discovery ─────────────────────────────────────────────────────
@@ -543,11 +622,13 @@ class MeshcoreRepeaterCard extends HTMLElement {
         <div class="header" id="hdr"></div>
         <div class="stats" id="stats"></div>
         <div id="neighbors"></div>
+        <div id="console"></div>
         <div class="charts" id="charts"></div>
       </div>`;
     this._renderHeader();
     this._renderStats();
     this._renderNeighborMap();
+    this._renderConsole();
     this._renderCharts();
   }
 
@@ -587,9 +668,11 @@ class MeshcoreRepeaterCard extends HTMLElement {
     if (sel) sel.addEventListener("change", () => {
       this._selectedPubkey = sel.value;
       this._historyLoadedFor = null;
+      this._consoleLog = [];
       this._renderHeader();
       this._renderStats();
       this._renderNeighborMap();
+      this._renderConsole();
       this._renderCharts();
       this._loadHistory(false);
     });
@@ -927,6 +1010,139 @@ class MeshcoreRepeaterCard extends HTMLElement {
       </svg>`;
   }
 
+  // ── CLI Console ───────────────────────────────────────────────────
+
+  async _resolveEntryId() {
+    if (this._config.entry_id) return this._config.entry_id;
+    const r = this._selected();
+    if (!r) return null;
+    const eid = r.online_entity || Object.values(r.sensorEntries)[0];
+    if (!eid) return null;
+    // hass.entities is available in HA 2022.6+ and has config_entry_id directly.
+    const fromReg = this._hass?.entities?.[eid]?.config_entry_id;
+    if (fromReg) return fromReg;
+    // Fallback: query entity registry via WebSocket.
+    try {
+      const entry = await this._hass.callWS({
+        type: "config/entity_registry/get",
+        entity_id: eid,
+      });
+      return entry?.config_entry_id || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async _subscribeConsole() {
+    if (this._consoleUnsub || !this._hass?.connection) return;
+    try {
+      this._consoleUnsub = await this._hass.connection.subscribeEvents(
+        (event) => this._onConsoleEvent(event),
+        "meshcore_message"
+      );
+    } catch (err) {
+      console.warn("meshcore-repeater-card: console event subscription failed", err);
+    }
+  }
+
+  _onConsoleEvent(event) {
+    const d = event.data;
+    if (d?.message_type !== "direct") return;
+    const r = this._selected();
+    if (!r) return;
+    const senderName = (d.sender_name || "").toLowerCase();
+    const rName = r.name.toLowerCase();
+    if (senderName !== rName) return;
+    this._consoleLog.push({ cls: "cl-recv", text: `← ${d.message || ""}` });
+    this._appendConsoleLog();
+  }
+
+  async _execConsoleCmd(cmd) {
+    if (!cmd.trim()) return;
+    const r = this._selected();
+    const entryId = await this._resolveEntryId();
+    if (!r) {
+      this._consoleLog.push({ cls: "cl-err", text: "No repeater selected." });
+      this._appendConsoleLog();
+      return;
+    }
+    if (!entryId) {
+      this._consoleLog.push({ cls: "cl-err", text: "entry_id unknown — add entry_id: <id> to card config." });
+      this._appendConsoleLog();
+      return;
+    }
+    this._consoleLog.push({ cls: "cl-sent", text: `→ ${cmd}` });
+    this._appendConsoleLog();
+    try {
+      await this._hass.callService("meshcore", "execute_command", {
+        entry_id: entryId,
+        command: `send_login "${r.name}"`,
+      });
+      await this._hass.callService("meshcore", "execute_command", {
+        entry_id: entryId,
+        command: `send_cmd "${r.name}" "${cmd}"`,
+      });
+    } catch (err) {
+      this._consoleLog.push({ cls: "cl-err", text: `Error: ${err?.message || String(err)}` });
+      this._appendConsoleLog();
+    }
+  }
+
+  _renderConsole() {
+    const el = this.shadowRoot.getElementById("console");
+    if (!el) return;
+    const logHtml = this._consoleLog.map(e =>
+      `<div class="${esc(e.cls)}">${esc(e.text)}</div>`
+    ).join("");
+    el.innerHTML = `
+      <div class="console-wrap">
+        <div class="console-title" id="console-toggle">
+          CLI Console
+          <span class="toggle">${this._consoleOpen ? "▲" : "▼"}</span>
+        </div>
+        <div class="console-body${this._consoleOpen ? " open" : ""}">
+          <div class="console-log" id="console-log">${logHtml}</div>
+          <div class="console-input">
+            <input type="text" id="console-input" placeholder="ver / reboot / clkreboot ..." autocomplete="off" spellcheck="false"/>
+            <button id="console-send">Send</button>
+          </div>
+        </div>
+      </div>`;
+    el.querySelector("#console-toggle").addEventListener("click", () => {
+      this._consoleOpen = !this._consoleOpen;
+      this._renderConsole();
+    });
+    const input = el.querySelector("#console-input");
+    const send = el.querySelector("#console-send");
+    const logEl = el.querySelector("#console-log");
+    if (logEl) logEl.scrollTop = logEl.scrollHeight;
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        const cmd = input.value.trim();
+        if (cmd) { input.value = ""; this._execConsoleCmd(cmd); }
+      }
+    });
+    send.addEventListener("click", () => {
+      const cmd = input.value.trim();
+      if (cmd) { input.value = ""; this._execConsoleCmd(cmd); }
+    });
+  }
+
+  _appendConsoleLog() {
+    const logEl = this.shadowRoot.getElementById("console-log");
+    if (logEl) {
+      const last = this._consoleLog[this._consoleLog.length - 1];
+      const div = document.createElement("div");
+      div.className = last.cls;
+      div.textContent = last.text;
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+    } else {
+      this._renderConsole();
+    }
+  }
+
   getCardSize() { return 5; }
   static getConfigElement() { return document.createElement("meshcore-repeater-card-editor"); }
   static getStubConfig() { return {}; }
@@ -995,6 +1211,7 @@ class MeshcoreRepeaterCardEditor extends HTMLElement {
       hours: Number(config?.hours) || 24,
       charts: Array.isArray(config?.charts) ? config.charts.slice() : DEFAULT_CHART_KEYS.slice(),
       stats: Array.isArray(config?.stats) ? config.stats.slice() : DEFAULT_STAT_KEYS.slice(),
+      entry_id: config?.entry_id || "",
     };
     if (!this._emitting) this._render();
   }
@@ -1024,11 +1241,12 @@ class MeshcoreRepeaterCardEditor extends HTMLElement {
 
     // Reset the keys we manage (so removing a value clears the YAML field).
     delete out.repeater; delete out.title; delete out.hours;
-    delete out.stats; delete out.charts;
+    delete out.stats; delete out.charts; delete out.entry_id;
 
     if (this._config.repeater) out.repeater = String(this._config.repeater).toLowerCase();
     if (this._config.title) out.title = this._config.title;
     if (this._config.hours && this._config.hours !== 24) out.hours = Number(this._config.hours);
+    if (this._config.entry_id) out.entry_id = this._config.entry_id;
     const stats = (this._config.stats || []).filter(Boolean);
     if (stats.length && stats.join(",") !== DEFAULT_STAT_KEYS.join(",")) out.stats = stats;
     const charts = (this._config.charts || []).filter(Boolean);
@@ -1046,6 +1264,7 @@ class MeshcoreRepeaterCardEditor extends HTMLElement {
     this._config.repeater = get("repeater")?.value || "";
     this._config.title = get("title")?.value || "";
     this._config.hours = Number(get("hours")?.value) || 24;
+    this._config.entry_id = get("entry_id")?.value.trim() || "";
     this._config.charts = Array.from(root.querySelectorAll('input[data-charts]:checked'))
       .map(cb => cb.value);
     this._config.stats = Array.from(root.querySelectorAll('input[data-stats]:checked'))
@@ -1085,6 +1304,14 @@ class MeshcoreRepeaterCardEditor extends HTMLElement {
           </label>
         </div>
         <div class="help">Auto-detect picks the first repeater found in HA's entity registry.</div>
+
+        <h4>CLI Console</h4>
+        <div class="row">
+          <label>Entry ID (optional)
+            <input type="text" name="entry_id" value="${esc(c.entry_id || "")}" placeholder="auto-detected"/>
+          </label>
+        </div>
+        <div class="help">Only needed if auto-detection fails. Find it in Settings → Devices &amp; services → MeshCore → open the integration → copy the ID from the URL.</div>
 
         <h4>Stat tiles</h4>
         <div class="checks">${statChecks}</div>

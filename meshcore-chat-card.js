@@ -2387,7 +2387,7 @@ class MeshcoreChatCard extends HTMLElement {
     // Re-subscribe automatically when the WS connection reconnects.
     // Only register once; _resubscribe clears stale unsubs then calls _subscribe again.
     if (!this._connReadyHandler) {
-      this._connReadyHandler = () => this._resubscribe();
+      this._connReadyHandler = () => setTimeout(() => this._resubscribe(), 0);
       this._hass.connection.addEventListener("ready", this._connReadyHandler);
     }
 
