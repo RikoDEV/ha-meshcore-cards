@@ -1,0 +1,30 @@
+alias: "MeshCore Bot: Testreg cmd"
+description: Responds to `es testreg` on channel 2 with the detected flood scope.
+triggers:
+  - trigger: event
+    event_type: meshcore_message
+    event_data:
+      message_type: channel
+      channel_idx: 2
+conditions:
+  - condition: template
+    value_template: >-
+      {{ (trigger.event.data.message | default('') | lower).startswith('es testreg') }}
+actions:
+  - data:
+      channel_idx: 2
+      message: >-
+        {% set sender = trigger.event.data.sender_name | default('') %}
+        {% set scope = trigger.event.data.rx_log_data[0].flood_scope
+           if trigger.event.data.rx_log_data | default([]) | length > 0
+           else none %}
+        @[{{ sender }}]
+        {% if scope %}
+        📡 Region: {{ scope }}
+        {% elif trigger.event.data.rx_log_data | default([]) | length > 0 %}
+        📡 Region: unknown (TC_FLOOD, matching scope missing)
+        {% else %}
+        📡 Region: none (global flood)
+        {% endif %}
+    action: meshcore.send_channel_message
+mode: single
