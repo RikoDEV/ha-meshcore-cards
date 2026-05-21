@@ -2593,14 +2593,17 @@ class MeshcoreChatCard extends HTMLElement {
   // ── Logbook history backfill ──────────────────────────────────────
   async _loadHistoryForActive() {
     if (!this._hass || !this._activeKey || this._pane !== "chats") return;
-    if (this._historyLoaded.has(this._activeKey)) return;
-    const entityId = this._entityIdFor(this._activeKey);
+    // Capture key immediately — before any await — so a channel switch mid-fetch
+    // cannot cause history from channel A to land in channel B's message array.
+    const key = this._activeKey;
+    if (this._historyLoaded.has(key)) return;
+    const entityId = this._entityIdFor(key);
     if (!entityId) {
       // No entity ID yet (prefix unknown); don't mark as loaded so a retry can succeed.
       if (this.shadowRoot?.getElementById("messages-area")) this._renderMessages();
       return;
     }
-    this._historyLoaded.add(this._activeKey);
+    this._historyLoaded.add(key);
 
     const hours = Math.max(1, this._config.history_hours || 24);
     const start = new Date(Date.now() - hours * 3600 * 1000).toISOString();
@@ -2612,7 +2615,6 @@ class MeshcoreChatCard extends HTMLElement {
       });
       if (!Array.isArray(events)) return;
       const myName = this._myName;
-      const key = this._activeKey;
       for (const ev of events) {
         // Logbook entries from this integration carry "<channel> Sender: msg"
         // or "Sender: msg". The raw event also contains domain=meshcore.
@@ -2636,9 +2638,12 @@ class MeshcoreChatCard extends HTMLElement {
         const own = !!myName && sender === myName;
         this._appendMessage(key, { sender, text, ts, own });
       }
-      this._renderMessages();
-      this._renderHeader(); // update message count now that history is loaded
-      this._renderSidebarList();
+      // Only update the UI if the user is still looking at this channel.
+      if (key === this._activeKey) {
+        this._renderMessages();
+        this._renderHeader();
+        this._renderSidebarList();
+      }
     } catch (err) {
       // Older HA versions: try the history fallback
       console.debug(
@@ -5691,7 +5696,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         const sf   = root.querySelector("#radio-sf")?.value;
         const cr   = root.querySelector("#radio-cr")?.value;
         if (!freq || !bw || !sf || !cr) { this._toast("Fill all 4 radio fields", "err"); return; }
-        await cmd(`set radio ${freq},${bw},${sf},${cr}`);
+        await cmd(`set_radio ${freq},${bw},${sf},${cr}`);
         Object.assign(this._deviceSettings, { radioFreq: parseFloat(freq), radioBw: parseFloat(bw), radioSf: parseInt(sf), radioCr: parseInt(cr) });
         this._toast("✓ Radio params applied — reboot required", "ok");
       })
@@ -5702,7 +5707,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       withBtn(root.querySelector("#tx-power-apply"), "Applying…", async () => {
         const val = root.querySelector("#tx-power")?.value;
         if (!val) return;
-        await cmd(`set tx ${val}`);
+        await cmd(`set_tx_power ${val}`);
         this._deviceSettings.txPower = parseInt(val);
         this._toast(`✓ TX power set to ${val} dBm`, "ok");
       })
