@@ -35,13 +35,17 @@ const CHAT_CARD_VERSION = "1.0.0";
 console.info(
   `%c MESHCORE-CHAT-CARD %c v${CHAT_CARD_VERSION} `,
   "color:#fff;background:#1976d2;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px",
-  "color:#1976d2;background:#e3f2fd;font-weight:700;padding:2px 4px;border-radius:0 3px 3px 0"
+  "color:#1976d2;background:#e3f2fd;font-weight:700;padding:2px 4px;border-radius:0 3px 3px 0",
 );
 
 const LS_PREFIX = "meshcore-chat-card:";
 
-
-const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const esc = (s) =>
+  String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 
 const COLORS = [
   "#4fc3f7",
@@ -268,10 +272,73 @@ const STYLE = `
     border: var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, var(--border));
     overflow: hidden;
     display: flex;
+    flex-direction: column;
     /* Height comes from --mcc-card-height (set inline on :host from
        config.height). Defaults to 600px, but can be any CSS length:
        a number → px, or strings like "80vh", "100%", "min(80vh, 900px)". */
     height: var(--mcc-card-height, 600px);
+  }
+
+  /* ── TOP TAB BAR ── */
+  .top-tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    flex-shrink: 0;
+  }
+  .top-tab {
+    flex: 1;
+    padding: 10px 4px 8px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text2);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+    outline: none;
+    transition: color 0.15s, border-color 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+  }
+  .top-tab:hover:not(.active) { color: var(--text); }
+  .top-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .top-tab-badge {
+    background: var(--accent);
+    /* Fallback for older browsers */
+    color: #fff;
+    /* oklch relative color: if accent lightness > 0.6 → black text, else → white.
+       Supported Chrome 111+, Firefox 116+, Safari 16.4+. */
+    color: oklch(from var(--accent) clamp(0, calc((0.6 - l) * 9999), 1) 0 h);
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 8px;
+    padding: 0 5px;
+    min-width: 16px;
+    text-align: center;
+    line-height: 16px;
+  }
+
+  /* ── MAIN CONTENT (below tab bar) ── */
+  .main-content {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* ── SETTINGS PANEL ── */
+  .settings-panel {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
   }
 
   /* ── SIDEBAR ── */
@@ -1099,26 +1166,30 @@ const STYLE = `
     position: sticky;
     top: 0;
     z-index: 2;
-    background: var(--card-background-color, var(--primary-background-color, #fff));
-    border-bottom: 1px solid var(--divider-color, rgba(0,0,0,.12));
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
   }
   .modal-tab {
     flex: 1;
-    padding: 12px 4px;
+    padding: 10px 4px 8px;
     border: none;
     border-bottom: 2px solid transparent;
     background: none;
     cursor: pointer;
     font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--secondary-text-color);
+    color: var(--text2);
+    font-family: inherit;
+    outline: none;
     transition: color 0.15s, border-color 0.15s;
   }
+  .modal-tab:hover:not(.active) { color: var(--text); }
   .modal-tab.active {
-    color: var(--primary-color);
-    border-bottom-color: var(--primary-color);
+    color: var(--accent);
+    border-bottom-color: var(--accent);
   }
   .modal-body {
     padding: 16px;
@@ -1729,6 +1800,51 @@ const STYLE = `
   }
   .console-send-btn:hover:not(:disabled) { opacity: 0.85; }
   .console-send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* ── Console commands sidebar ── */
+  .cmd-list {
+    padding: 4px 0 8px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .cmd-list-title {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 8px 14px 4px;
+  }
+  .cmd-item {
+    padding: 5px 14px;
+    cursor: pointer;
+    border-radius: 6px;
+    margin: 1px 6px;
+    transition: background 0.12s;
+  }
+  .cmd-item:hover { background: var(--bg3, rgba(255,255,255,0.07)); }
+  .cmd-sig {
+    font-family: ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    word-break: break-all;
+  }
+  .cmd-desc {
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 1px;
+  }
+
+  /* ── Full-width console input at card bottom ── */
+  .card[data-pane="console"] > .input-area {
+    flex-shrink: 0;
+    padding: 0;
+    border-top: none;
+  }
+  .card[data-pane="console"] .console-input-wrap {
+    border-top: none;
+    width: 100%;
+  }
 `;
 
 class MeshcoreChatCard extends HTMLElement {
@@ -1741,7 +1857,7 @@ class MeshcoreChatCard extends HTMLElement {
     this._unread = {}; // { key: count }
     this._activeKey = null; // active chat OR active node
     this._pane = "chats"; // "chats" | "nodes"
-    this._filter = "all";     // chats sub-filter
+    this._filter = "all"; // chats sub-filter
     this._nodeFilter = "all"; // nodes sub-filter: "all" | "clients" | "repeaters"
     this._search = "";
     this._unsubscribe = null;
@@ -1760,9 +1876,7 @@ class MeshcoreChatCard extends HTMLElement {
 
     this._replyDrafts = {}; // { [chatKey]: {sender, text} } — per-chat reply drafts
 
-    // Settings modal state
-    this._settingsOpen = false;
-    this._settingsTab = "general"; // "general" | "channels" | "contacts" | "about"
+    this._settingsTab = "general"; // "general" | "device" | "channels" | "contacts" | "about"
     this._settings = this._loadSettings(); // companion prefs (per-browser)
     this._draftSettings = null; // working copy while modal is open
     this._draftChannels = null;
@@ -1770,14 +1884,23 @@ class MeshcoreChatCard extends HTMLElement {
     this._deviceSettings = {
       loading: false,
       // info
-      deviceName: null, firmware: null, hardware: null, publicKey: null, connectionType: null,
+      deviceName: null,
+      firmware: null,
+      hardware: null,
+      publicKey: null,
+      connectionType: null,
       // radio
-      radioFreq: null, radioBw: null, radioSf: null, radioCr: null,
-      txPower: null, rxGain: null, dutyCycle: null,
+      radioFreq: null,
+      radioBw: null,
+      radioSf: null,
+      radioCr: null,
+      txPower: null,
+      rxGain: null,
       // location
-      lat: null, lon: null,
+      lat: null,
+      lon: null,
       // mesh
-      pathHashMode: null, regionDefault: null,
+      pathHashMode: null,
     };
 
     this._hiddenChats = new Set(this._settings.hidden_chats || []);
@@ -1797,7 +1920,6 @@ class MeshcoreChatCard extends HTMLElement {
     this._consoleSending = false;
 
     // Region join state (inside Settings > Channels).
-
   }
 
   setConfig(config) {
@@ -1876,12 +1998,15 @@ class MeshcoreChatCard extends HTMLElement {
   }
   _saveViewState() {
     try {
-      localStorage.setItem(this._viewStateKey(), JSON.stringify({
-        pane: this._pane,
-        activeKey: this._activeKey,
-        filter: this._filter,
-        nodeFilter: this._nodeFilter,
-      }));
+      localStorage.setItem(
+        this._viewStateKey(),
+        JSON.stringify({
+          pane: this._pane === "settings" ? "chats" : this._pane,
+          activeKey: this._activeKey,
+          filter: this._filter,
+          nodeFilter: this._nodeFilter,
+        }),
+      );
     } catch (_) {}
   }
   _restoreViewState() {
@@ -1964,12 +2089,17 @@ class MeshcoreChatCard extends HTMLElement {
 
   disconnectedCallback() {
     if (this._connReadyHandler && this._hass) {
-      this._hass.connection.removeEventListener("ready", this._connReadyHandler);
+      this._hass.connection.removeEventListener(
+        "ready",
+        this._connReadyHandler,
+      );
       this._connReadyHandler = null;
     }
     if (this._unsubscribers) {
       for (const u of this._unsubscribers) {
-        try { Promise.resolve(u()).catch(() => {}); } catch (_) {}
+        try {
+          Promise.resolve(u()).catch(() => {});
+        } catch (_) {}
       }
       this._unsubscribers = [];
     }
@@ -2009,7 +2139,11 @@ class MeshcoreChatCard extends HTMLElement {
     if (!this._devicePrefix) return;
     // If prefix was just discovered and active chat history hasn't loaded yet,
     // kick off the load now (first attempt failed with null entityId).
-    if (!hadPrefix && this._activeKey && !this._historyLoaded.has(this._activeKey)) {
+    if (
+      !hadPrefix &&
+      this._activeKey &&
+      !this._historyLoaded.has(this._activeKey)
+    ) {
       this._loadHistoryForActive();
     }
 
@@ -2141,7 +2275,8 @@ class MeshcoreChatCard extends HTMLElement {
 
     const nodes = [];
     for (const [id, st] of Object.entries(states)) {
-      if (!id.startsWith("binary_sensor.") || !id.endsWith("_contact")) continue;
+      if (!id.startsWith("binary_sensor.") || !id.endsWith("_contact"))
+        continue;
       const attrs = st.attributes || {};
       if (!attrs.public_key && !attrs.adv_name) continue;
       const pk = (attrs.public_key || "").slice(0, 12);
@@ -2266,13 +2401,21 @@ class MeshcoreChatCard extends HTMLElement {
     let list = null;
     try {
       const resp = await this._hass.connection.sendMessagePromise({
-        type: "call_service", domain: "meshcore", service: "get_channels",
-        service_data: this._svcData(), return_response: true,
+        type: "call_service",
+        domain: "meshcore",
+        service: "get_channels",
+        service_data: this._svcData(),
+        return_response: true,
       });
-      list = resp?.response?.channels || resp?.result?.response?.channels || null;
+      list =
+        resp?.response?.channels || resp?.result?.response?.channels || null;
     } catch (err) {
       try {
-        await this._hass.callService("meshcore", "get_channels", this._svcData());
+        await this._hass.callService(
+          "meshcore",
+          "get_channels",
+          this._svcData(),
+        );
       } catch (e2) {
         console.debug("meshcore-chat-card: get_channels unavailable:", err, e2);
       }
@@ -2301,13 +2444,21 @@ class MeshcoreChatCard extends HTMLElement {
     let list = null;
     try {
       const resp = await this._hass.connection.sendMessagePromise({
-        type: "call_service", domain: "meshcore", service: "get_contacts",
-        service_data: this._svcData(), return_response: true,
+        type: "call_service",
+        domain: "meshcore",
+        service: "get_contacts",
+        service_data: this._svcData(),
+        return_response: true,
       });
-      list = resp?.response?.contacts || resp?.result?.response?.contacts || null;
+      list =
+        resp?.response?.contacts || resp?.result?.response?.contacts || null;
     } catch (err) {
       try {
-        await this._hass.callService("meshcore", "get_contacts", this._svcData());
+        await this._hass.callService(
+          "meshcore",
+          "get_contacts",
+          this._svcData(),
+        );
       } catch (e2) {
         console.debug("meshcore-chat-card: get_contacts unavailable:", err, e2);
       }
@@ -2322,8 +2473,8 @@ class MeshcoreChatCard extends HTMLElement {
         last_advert: c.last_advert || 0,
       }));
     }
-    if (this._settingsOpen && this._settingsTab === "contacts") {
-      this._renderSettingsModal();
+    if (this._pane === "settings" && this._settingsTab === "contacts") {
+      this._renderSettingsPanel();
     }
   }
 
@@ -2332,18 +2483,28 @@ class MeshcoreChatCard extends HTMLElement {
     // shlex double-quoting so names with spaces / shell metacharacters round-trip cleanly.
     const safe = `"${String(pubkeyOrName).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
     try {
-      await this._hass.callService("meshcore", "execute_command",
-        this._svcData({ command: `${action}_contact ${safe}` }));
+      await this._hass.callService(
+        "meshcore",
+        "execute_command",
+        this._svcData({ command: `${action}_contact ${safe}` }),
+      );
       await new Promise((r) => setTimeout(r, 250));
       await this._refreshContactsFromService();
       return { ok: true };
     } catch (err) {
       console.error(`meshcore-chat-card: ${action}_contact failed`, err);
-      return { ok: false, error: err?.message || err?.error || String(err) || "unknown error" };
+      return {
+        ok: false,
+        error: err?.message || err?.error || String(err) || "unknown error",
+      };
     }
   }
-  _addContactToDevice(pk) { return this._contactOp("add", pk); }
-  _removeContactFromDevice(pk) { return this._contactOp("remove", pk); }
+  _addContactToDevice(pk) {
+    return this._contactOp("add", pk);
+  }
+  _removeContactFromDevice(pk) {
+    return this._contactOp("remove", pk);
+  }
 
   _nodeTypeLabel(type) {
     switch (type) {
@@ -2401,7 +2562,10 @@ class MeshcoreChatCard extends HTMLElement {
         console.warn("meshcore-chat-card: event subscription failed", err),
       );
     this._hass.connection
-      .subscribeEvents((event) => this._handleDeliveryUpdate(event), "meshcore_delivery_update")
+      .subscribeEvents(
+        (event) => this._handleDeliveryUpdate(event),
+        "meshcore_delivery_update",
+      )
       .then((unsub) => this._unsubscribers.push(unsub))
       .catch(() => {});
   }
@@ -2600,7 +2764,8 @@ class MeshcoreChatCard extends HTMLElement {
     const entityId = this._entityIdFor(key);
     if (!entityId) {
       // No entity ID yet (prefix unknown); don't mark as loaded so a retry can succeed.
-      if (this.shadowRoot?.getElementById("messages-area")) this._renderMessages();
+      if (this.shadowRoot?.getElementById("messages-area"))
+        this._renderMessages();
       return;
     }
     this._historyLoaded.add(key);
@@ -2665,8 +2830,7 @@ class MeshcoreChatCard extends HTMLElement {
 
   _buildReplyText(reply, body) {
     if (!reply || !reply.sender) return body;
-    if (this._myName && reply.sender === this._myName)
-      return body;
+    if (this._myName && reply.sender === this._myName) return body;
     return `@[${reply.sender}] ${body}`;
   }
 
@@ -2728,7 +2892,9 @@ class MeshcoreChatCard extends HTMLElement {
 
   // Build service call data, automatically injecting entry_id when configured.
   _svcData(base = {}) {
-    return this._config.entry_id ? { ...base, entry_id: this._config.entry_id } : base;
+    return this._config.entry_id
+      ? { ...base, entry_id: this._config.entry_id }
+      : base;
   }
 
   get _myName() {
@@ -2802,12 +2968,18 @@ class MeshcoreChatCard extends HTMLElement {
           return;
         }
       }
-      serviceCall = this._hass.callService("meshcore", "send_channel_message",
-        this._svcData({ channel_idx: chIdx, message: text }));
+      serviceCall = this._hass.callService(
+        "meshcore",
+        "send_channel_message",
+        this._svcData({ channel_idx: chIdx, message: text }),
+      );
     } else if (key.startsWith("dm:")) {
       const prefix = key.split(":")[1];
-      serviceCall = this._hass.callService("meshcore", "send_message",
-        this._svcData({ pubkey_prefix: prefix, message: text }));
+      serviceCall = this._hass.callService(
+        "meshcore",
+        "send_message",
+        this._svcData({ pubkey_prefix: prefix, message: text }),
+      );
     } else {
       this._sending = false;
       if (btn) btn.disabled = false;
@@ -2912,20 +3084,37 @@ class MeshcoreChatCard extends HTMLElement {
     if (key.startsWith("ch:")) {
       const chIdx = this._resolveChannelIdx(key);
       if (!Number.isInteger(chIdx)) return;
-      serviceCall = this._hass.callService("meshcore", "send_channel_message",
-        this._svcData({ channel_idx: chIdx, message: text }));
+      serviceCall = this._hass.callService(
+        "meshcore",
+        "send_channel_message",
+        this._svcData({ channel_idx: chIdx, message: text }),
+      );
     } else if (key.startsWith("dm:")) {
       const prefix = key.split(":")[1];
-      serviceCall = this._hass.callService("meshcore", "send_message",
-        this._svcData({ pubkey_prefix: prefix, message: text }));
+      serviceCall = this._hass.callService(
+        "meshcore",
+        "send_message",
+        this._svcData({ pubkey_prefix: prefix, message: text }),
+      );
     } else {
       return;
     }
     const echoTs = Date.now();
     const echoMeta = key.startsWith("ch:")
-      ? { outgoing: true, message_type: "channel", progressive: true, repeater_count: null }
+      ? {
+          outgoing: true,
+          message_type: "channel",
+          progressive: true,
+          repeater_count: null,
+        }
       : { outgoing: true, message_type: "direct", ack_received: null };
-    this._appendMessage(key, { sender: this._config.node_name || "Me", text, ts: echoTs, own: true, meta: echoMeta });
+    this._appendMessage(key, {
+      sender: this._config.node_name || "Me",
+      text,
+      ts: echoTs,
+      own: true,
+      meta: echoMeta,
+    });
     this._renderMessages();
     serviceCall
       .catch((err) => console.error("meshcore-chat-card: resend failed", err))
@@ -2933,9 +3122,18 @@ class MeshcoreChatCard extends HTMLElement {
         if (key.startsWith("ch:")) {
           setTimeout(() => {
             const arr = this._messages[key] || [];
-            for (let i = arr.length - 1; i >= Math.max(0, arr.length - 4); i--) {
+            for (
+              let i = arr.length - 1;
+              i >= Math.max(0, arr.length - 4);
+              i--
+            ) {
               const m = arr[i];
-              if (m.own && m.text === text && Math.abs(m.ts - echoTs) < 8000 && m.meta?.progressive) {
+              if (
+                m.own &&
+                m.text === text &&
+                Math.abs(m.ts - echoTs) < 8000 &&
+                m.meta?.progressive
+              ) {
                 m.meta.progressive = false;
                 if (key === this._activeKey) this._renderMessages();
                 break;
@@ -2954,17 +3152,27 @@ class MeshcoreChatCard extends HTMLElement {
       el.innerHTML = `<div class="console-empty">No commands yet.<br>Type a MeshCore command below and press Enter.<br><span style="opacity:0.55">e.g. <code>send_advert</code> · <code>reset_path &lt;pubkey_prefix&gt;</code></span></div>`;
       return;
     }
-    el.innerHTML = this._consoleLogs.map((entry, i) => {
-      const time = new Date(entry.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      const badgeCls = entry.status;
-      const badgeLabel = entry.status === "pending" ? "…" : entry.status === "ok" ? "✓ ok" : "✗ err";
-      const extraRow = entry.error
-        ? `<div class="console-error-text">${esc(entry.error)}</div>`
-        : entry.output
-          ? `<div class="console-output">${esc(entry.output)}</div>`
-          : "";
-      const consoleCopyIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
-      return `<div class="console-entry ${entry.status}" data-entry-idx="${i}">
+    el.innerHTML = this._consoleLogs
+      .map((entry, i) => {
+        const time = new Date(entry.ts).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+        const badgeCls = entry.status;
+        const badgeLabel =
+          entry.status === "pending"
+            ? "…"
+            : entry.status === "ok"
+              ? "✓ ok"
+              : "✗ err";
+        const extraRow = entry.error
+          ? `<div class="console-error-text">${esc(entry.error)}</div>`
+          : entry.output
+            ? `<div class="console-output">${esc(entry.output)}</div>`
+            : "";
+        const consoleCopyIcon = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+        return `<div class="console-entry ${entry.status}" data-entry-idx="${i}">
         <div class="console-entry-row">
           <span class="console-prompt">&gt;</span>
           <span class="console-cmd">${esc(entry.cmd)}</span>
@@ -2974,7 +3182,8 @@ class MeshcoreChatCard extends HTMLElement {
         </div>
         ${extraRow}
       </div>`;
-    }).join("");
+      })
+      .join("");
     // Wire console copy buttons.
     el.querySelectorAll(".console-copy-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -3003,7 +3212,10 @@ class MeshcoreChatCard extends HTMLElement {
     const btn = el.querySelector(".console-send-btn");
     if (savedText) input.value = savedText;
     input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this._sendCommand(input.value.trim()); }
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        this._sendCommand(input.value.trim());
+      }
     });
     btn.addEventListener("click", () => this._sendCommand(input.value.trim()));
   }
@@ -3025,21 +3237,31 @@ class MeshcoreChatCard extends HTMLElement {
       // returnResponse:true (6th arg) forces HA to propagate HomeAssistantError
       // as a WS-level rejection instead of silently logging it.
       const result = await this._hass.callService(
-        "meshcore", "execute_command",
+        "meshcore",
+        "execute_command",
         this._svcData({ command: cmd }),
-        undefined, false, true
+        undefined,
+        false,
+        true,
       );
       entry.status = "ok";
       const raw = result?.response;
       if (raw != null) {
-        entry.output = typeof raw === "string"
-          ? raw
-          : raw.output ?? raw.response ?? raw.result ?? raw.message ?? JSON.stringify(raw, null, 2);
+        entry.output =
+          typeof raw === "string"
+            ? raw
+            : (raw.output ??
+              raw.response ??
+              raw.result ??
+              raw.message ??
+              JSON.stringify(raw, null, 2));
       }
     } catch (err) {
       entry.status = "err";
       const msg = err?.message || String(err);
-      entry.error = msg.includes("NoneType") ? "Unknown or unsupported command" : msg;
+      entry.error = msg.includes("NoneType")
+        ? "Unknown or unsupported command"
+        : msg;
     } finally {
       this._consoleSending = false;
       this._saveConsoleHistory();
@@ -3048,7 +3270,6 @@ class MeshcoreChatCard extends HTMLElement {
       this._renderInput();
     }
   }
-
 
   // Channel management: create / set a channel via execute_command set_channel.
   // Mirrors the docs recipe: set_channel <idx> <name> <sha256(name)[:32]>
@@ -3059,8 +3280,11 @@ class MeshcoreChatCard extends HTMLElement {
     if (!Number.isInteger(idx) || idx < 0 || idx > 255) return;
     try {
       const hash = await sha256Hex32(trimmed);
-      await this._hass.callService("meshcore", "execute_command",
-        this._svcData({ command: `set_channel ${idx} ${trimmed} ${hash}` }));
+      await this._hass.callService(
+        "meshcore",
+        "execute_command",
+        this._svcData({ command: `set_channel ${idx} ${trimmed} ${hash}` }),
+      );
       // Optimistic local insertion so it appears immediately
       const existing = this._discoveredChannels.find((c) => c.idx === idx);
       if (existing) existing.name = trimmed;
@@ -3100,25 +3324,69 @@ class MeshcoreChatCard extends HTMLElement {
 
   _setPane(pane) {
     if (this._pane === pane) return;
+    const leavingSettings = this._pane === "settings";
     this._pane = pane;
-    // Pick a sensible active item for the new pane
-    if (pane === "chats") {
-      const keys = this._chatKeys();
-      this._activeKey = keys[0] || null;
-    } else if (pane === "nodes") {
-      this._activeKey = this._discoveredNodes[0]
-        ? `node:${this._discoveredNodes[0].pubkey_prefix}`
-        : null;
+
+    if (pane === "settings") {
+      this._applyStatus = null;
+      this._refreshContactsFromService();
+      this._draftSettings = {
+        node_name: this._settings.node_name ?? this._config.node_name ?? "",
+        device_prefix:
+          this._settings.device_prefix ??
+          this._config.device_prefix ??
+          this._devicePrefix ??
+          "",
+        entry_id: this._settings.entry_id ?? this._config.entry_id ?? "",
+        max_messages:
+          this._settings.max_messages ?? this._config.max_messages ?? 200,
+        history_hours:
+          this._settings.history_hours ?? this._config.history_hours ?? 24,
+        default_pane:
+          this._settings.default_pane ?? this._config.default_pane ?? "chats",
+        compact: this._settings.compact ?? this._config.compact ?? false,
+        height: this._settings.height ?? this._config.height ?? "",
+        show_hops: this._showHops,
+      };
+      this._draftChannels = this._settings.channels?.length
+        ? this._settings.channels.map((c) => ({ ...c }))
+        : this._discoveredChannels.map((c) => ({ idx: c.idx, name: c.name }));
+      this._draftContacts = this._settings.contacts?.length
+        ? this._settings.contacts.map((c) => ({ ...c }))
+        : this._discoveredContacts.map((c) => ({
+            pubkey_prefix: c.pubkey_prefix,
+            name: c.name,
+          }));
+      this._knownChannelIdxsAtOpen = new Set(
+        this._discoveredChannels.map((c) => c.idx),
+      );
     } else {
-      // console pane — no active chat key
-      this._activeKey = null;
+      if (leavingSettings) {
+        this._draftSettings = null;
+        this._draftChannels = null;
+        this._draftContacts = null;
+      }
+      // Pick a sensible active item for the new pane.
+      if (pane === "chats") {
+        const keys = this._chatKeys();
+        this._activeKey = keys[0] || null;
+      } else if (pane === "nodes") {
+        this._activeKey = this._discoveredNodes[0]
+          ? `node:${this._discoveredNodes[0].pubkey_prefix}`
+          : null;
+      } else {
+        this._activeKey = null;
+      }
     }
+
     this._saveViewState();
     this._render();
-    this._loadHistoryForActive();
-    // On mobile, switching panes should land the user on the sidebar list,
-    // not a stale chat from the previous pane.
-    this._mobileShowSidebar();
+    if (pane === "settings") {
+      this._fetchDeviceSettings();
+    } else {
+      this._loadHistoryForActive();
+      this._mobileShowSidebar();
+    }
   }
 
   // ── Display helpers ───────────────────────────────────────────────
@@ -3196,7 +3464,12 @@ class MeshcoreChatCard extends HTMLElement {
       const t = (n.type || "").toLowerCase();
       if (f === "repeaters" && !t.includes("repeater")) return false;
       if (f === "clients" && t.includes("repeater")) return false;
-      if (q && !(n.name || "").toLowerCase().includes(q) && !(n.pubkey_prefix || "").toLowerCase().includes(q)) return false;
+      if (
+        q &&
+        !(n.name || "").toLowerCase().includes(q) &&
+        !(n.pubkey_prefix || "").toLowerCase().includes(q)
+      )
+        return false;
       return true;
     });
   }
@@ -3204,30 +3477,60 @@ class MeshcoreChatCard extends HTMLElement {
   // ── Rendering ─────────────────────────────────────────────────────
   _render() {
     const shadow = this.shadowRoot;
-    shadow.innerHTML = `<style>${STYLE}</style><div class="card" style="position:relative">
-      <div class="sidebar" id="sidebar"></div>
-      <div class="chat-panel">
-        <div class="chat-header" id="chat-header"></div>
-        <div class="messages-area" id="messages-area"></div>
-        <div class="autocomplete-popup" id="autocomplete-popup" hidden></div>
-        <div class="input-area" id="input-area"></div>
-        <button class="scroll-to-bottom" id="scroll-to-bottom-btn" hidden title="Scroll to bottom">
-          <ha-icon icon="mdi:chevron-down"></ha-icon>
+    const p = this._pane;
+    const unread = Object.values(this._unread).reduce((a, b) => a + b, 0);
+    const onSettings = p === "settings";
+    const onConsole = p === "console";
+    shadow.innerHTML = `<style>${STYLE}</style><div class="card" data-pane="${p}">
+      <div class="top-tab-bar">
+        <button class="top-tab${p === "chats" ? " active" : ""}" data-pane="chats">
+          Chat${unread ? `<span class="top-tab-badge">${unread}</span>` : ""}
         </button>
+        <button class="top-tab${p === "nodes" ? " active" : ""}" data-pane="nodes">
+          Nodes${this._discoveredNodes.length ? `<span class="top-tab-badge">${this._discoveredNodes.length}</span>` : ""}
+        </button>
+        <button class="top-tab${onConsole ? " active" : ""}" data-pane="console">Console</button>
+        <button class="top-tab${onSettings ? " active" : ""}" data-pane="settings">Settings</button>
       </div>
-      <div id="modal-root"></div>
+      <div class="main-content">
+        <div class="sidebar" id="sidebar" style="${onSettings ? "display:none" : ""}"></div>
+        <div class="chat-panel" style="${onSettings ? "display:none" : ""}">
+          <div class="chat-header" id="chat-header"></div>
+          <div class="messages-area" id="messages-area"></div>
+          ${
+            onConsole
+              ? ""
+              : `<div class="autocomplete-popup" id="autocomplete-popup" hidden></div>
+          <div class="input-area" id="input-area"></div>
+          <button class="scroll-to-bottom" id="scroll-to-bottom-btn" hidden title="Scroll to bottom">
+            <ha-icon icon="mdi:chevron-down"></ha-icon>
+          </button>`
+          }
+        </div>
+        <div class="settings-panel" id="panel-settings" style="${onSettings ? "" : "display:none"}"></div>
+      </div>
+      ${onConsole ? `<div class="input-area" id="input-area"></div>` : ""}
     </div>`;
+
+    shadow.querySelector(".top-tab-bar").addEventListener("click", (e) => {
+      const btn = e.target.closest(".top-tab");
+      if (btn) this._setPane(btn.dataset.pane);
+    });
+
     this._renderSidebar();
-    this._renderHeader();
-    this._renderMessages();
-    this._renderInput();
-    this._renderSettingsModal();
-    this._wireScrollToBottom();
+    if (!onSettings) {
+      this._renderHeader();
+      this._renderMessages();
+      this._renderInput();
+      if (!onConsole) this._wireScrollToBottom();
+    } else {
+      this._renderSettingsPanel();
+    }
   }
 
   _wireScrollToBottom() {
     const area = this.shadowRoot.getElementById("messages-area");
-    const btn  = this.shadowRoot.getElementById("scroll-to-bottom-btn");
+    const btn = this.shadowRoot.getElementById("scroll-to-bottom-btn");
     if (!area || !btn) return;
     const update = () => {
       const dist = area.scrollHeight - area.scrollTop - area.clientHeight;
@@ -3281,6 +3584,36 @@ class MeshcoreChatCard extends HTMLElement {
           <button class="filter-tab ${this._nodeFilter === "clients" ? "active" : ""}" data-node-filter="clients">Clients</button>
           <button class="filter-tab ${this._nodeFilter === "repeaters" ? "active" : ""}" data-node-filter="repeaters">Repeaters</button>
         </div>`;
+    } else if (this._pane === "console") {
+      const CMDS = [
+        { sig: "send_advert", desc: "Broadcast presence to mesh" },
+        { sig: "reset_path <pubkey_prefix>", desc: "Reset path to contact" },
+        { sig: "get_bat", desc: "Get battery level" },
+        { sig: "get_time", desc: "Get device time" },
+        { sig: "get_devicetime", desc: "Get device timestamp" },
+        { sig: "set_name <name>", desc: "Set node name" },
+        {
+          sig: "set_radio <freq> <bw> <sf> <cr>",
+          desc: "Set radio parameters",
+        },
+        { sig: "set_tx_power <tx>", desc: "Set TX power" },
+        { sig: "set_radio.rxgain <val>", desc: "Set RX gain" },
+        { sig: "set_coords <lat> <lon>", desc: "Set GPS coordinates" },
+        { sig: "set_channel <idx> <name> <hash>", desc: "Set channel" },
+        { sig: "set_path_hash_mode <0|1>", desc: "Set path hash mode" },
+        { sig: "get_msg <offset>", desc: "Get message at offset" },
+        { sig: "send_login <key> <password>", desc: "Login to contact" },
+        { sig: "send_msg <key> <text>", desc: "Send direct message" },
+      ];
+      filterTabs = `<div class="cmd-list">
+        <div class="cmd-list-title">Available Commands</div>
+        ${CMDS.map(
+          (c, i) => `<div class="cmd-item" data-cmd-idx="${i}">
+          <div class="cmd-sig">${esc(c.sig)}</div>
+          <div class="cmd-desc">${esc(c.desc)}</div>
+        </div>`,
+        ).join("")}
+      </div>`;
     }
 
     const addBtn = onChats
@@ -3294,27 +3627,25 @@ class MeshcoreChatCard extends HTMLElement {
         <line x1="12" y1="15" x2="12" y2="22"/>
       </svg>
     </button>`;
-    const gearBtn = `<button class="add-btn" title="Settings" data-action="open-settings" style="font-size:14px">⚙</button>`;
 
     el.innerHTML = `
-      <div class="sidebar-header">
+      <div class="sidebar-header"${this._pane === "console" ? ' style="display:none"' : ""}>
         <div class="sidebar-title">
           <span>MeshCore</span>
-          <span style="display:flex;gap:4px;position:relative" id="header-actions">${addBtn}${advertBtn}${gearBtn}</span>
+          <span style="display:flex;gap:4px;position:relative" id="header-actions">${addBtn}${advertBtn}</span>
         </div>
-        ${this._pane !== "console" ? `<div class="search-box">
+        ${
+          this._pane !== "console"
+            ? `<div class="search-box">
           <ha-icon icon="mdi:magnify"></ha-icon>
           <input class="search-input" placeholder="${onChats ? "Search chats…" : "Search nodes…"}" />
-        </div>` : ""}
-      </div>
-      <div class="pane-tabs">
-        <button class="pane-tab ${this._pane === "chats" ? "active" : ""}" data-pane="chats">Chats</button>
-        <button class="pane-tab ${this._pane === "nodes" ? "active" : ""}" data-pane="nodes">Nodes${this._discoveredNodes.length ? ` (${this._discoveredNodes.length})` : ""}</button>
-        <button class="pane-tab ${this._pane === "console" ? "active" : ""}" data-pane="console">Console</button>
+        </div>`
+            : ""
+        }
       </div>
       ${filterTabs}
       ${addForm}
-      <div class="channel-list" id="channel-list"></div>`;
+      ${this._pane !== "console" ? `<div class="channel-list" id="channel-list"></div>` : ""}`;
 
     // Restore search value & cursor without re-creating the input
     const searchInput = el.querySelector(".search-input");
@@ -3327,9 +3658,6 @@ class MeshcoreChatCard extends HTMLElement {
       });
     }
 
-    el.querySelectorAll(".pane-tab").forEach((b) =>
-      b.addEventListener("click", () => this._setPane(b.dataset.pane)),
-    );
     el.querySelectorAll(".filter-tab[data-filter]").forEach((b) =>
       b.addEventListener("click", () => {
         this._filter = b.dataset.filter;
@@ -3367,16 +3695,25 @@ class MeshcoreChatCard extends HTMLElement {
         this._addChannel(idx, name);
       });
 
-    const gearBtnEl = el.querySelector('[data-action="open-settings"]');
-    if (gearBtnEl)
-      gearBtnEl.addEventListener("click", () => this._openSettings());
-
     const advertBtnEl = el.querySelector('[data-action="open-advert"]');
     if (advertBtnEl)
       advertBtnEl.addEventListener("click", (e) => {
         e.stopPropagation();
         this._toggleAdvertMenu();
       });
+
+    el.querySelectorAll(".cmd-item[data-cmd-idx]").forEach((item) => {
+      item.addEventListener("click", () => {
+        const sig = item.querySelector(".cmd-sig")?.textContent?.trim() ?? "";
+        // Strip placeholder tokens (<…>) and trailing space so the user fills them in.
+        const base = sig.replace(/<[^>]+>/g, "").replace(/\s+$/, "");
+        const input = this.shadowRoot.querySelector(".console-input");
+        if (input) {
+          input.value = base;
+          input.focus();
+        }
+      });
+    });
 
     this._renderSidebarList();
   }
@@ -3422,9 +3759,13 @@ class MeshcoreChatCard extends HTMLElement {
         return;
       }
       list.innerHTML = nodes.map((n) => this._renderNodeRow(n)).join("");
-      list.querySelectorAll(".channel-item").forEach((item) =>
-        item.addEventListener("click", () => this._selectKey(item.dataset.key))
-      );
+      list
+        .querySelectorAll(".channel-item")
+        .forEach((item) =>
+          item.addEventListener("click", () =>
+            this._selectKey(item.dataset.key),
+          ),
+        );
     } else {
       // console pane — sidebar list is empty
       list.innerHTML = `<div class="empty-list" style="font-size:11px;opacity:0.7">Send MeshCore commands<br>and see feedback in the panel.</div>`;
@@ -3490,13 +3831,19 @@ class MeshcoreChatCard extends HTMLElement {
           Clear
         </button>
         <div class="status-dot" title="Connected"></div>`;
-      el.querySelector('[data-action="mobile-back"]')?.addEventListener("click", () => this._mobileShowSidebar());
-      el.querySelector('[data-action="clear-console"]')?.addEventListener("click", () => {
-        this._consoleLogs = [];
-        this._saveConsoleHistory();
-        this._renderHeader();
-        this._renderMessages();
-      });
+      el.querySelector('[data-action="mobile-back"]')?.addEventListener(
+        "click",
+        () => this._mobileShowSidebar(),
+      );
+      el.querySelector('[data-action="clear-console"]')?.addEventListener(
+        "click",
+        () => {
+          this._consoleLogs = [];
+          this._saveConsoleHistory();
+          this._renderHeader();
+          this._renderMessages();
+        },
+      );
       return;
     }
     if (!this._activeKey) {
@@ -3589,7 +3936,9 @@ class MeshcoreChatCard extends HTMLElement {
       const neighborPk = st.attributes?.pubkey_prefix || "";
       const match = neighborPk
         ? this._discoveredNodes.find((n) =>
-            n.pubkey_prefix.toLowerCase().startsWith(neighborPk.slice(0, 6).toLowerCase()),
+            n.pubkey_prefix
+              .toLowerCase()
+              .startsWith(neighborPk.slice(0, 6).toLowerCase()),
           )
         : null;
       neighbors.push({
@@ -3606,7 +3955,9 @@ class MeshcoreChatCard extends HTMLElement {
       return `<div class="node-map-wrap"><div class="node-map-empty">No neighbor data.<br>Enable repeater neighbor tracking in integration settings.</div></div>`;
     }
 
-    const W = 420, H = 220, PAD = 44;
+    const W = 420,
+      H = 220,
+      PAD = 44;
     const hasGps = a.adv_lat && a.adv_lon;
     const allHaveGps = hasGps && neighbors.every((n) => n.lat && n.lon);
 
@@ -3622,8 +3973,10 @@ class MeshcoreChatCard extends HTMLElement {
     if (allHaveGps) {
       const lats = [a.adv_lat, ...neighbors.map((n) => n.lat)];
       const lons = [a.adv_lon, ...neighbors.map((n) => n.lon)];
-      const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-      const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+      const minLat = Math.min(...lats),
+        maxLat = Math.max(...lats);
+      const minLon = Math.min(...lons),
+        maxLon = Math.max(...lons);
       const dLat = maxLat - minLat || 0.002;
       const dLon = maxLon - minLon || 0.002;
       const cosLat = Math.cos(((minLat + maxLat) / 2) * (Math.PI / 180));
@@ -3647,14 +4000,19 @@ class MeshcoreChatCard extends HTMLElement {
       const R = Math.min(W, H) / 2 - PAD;
       neighbors.forEach((n, i) => {
         const angle = (2 * Math.PI * i) / neighbors.length - Math.PI / 2;
-        pos[i] = { x: W / 2 + R * Math.cos(angle), y: H / 2 + R * Math.sin(angle) };
+        pos[i] = {
+          x: W / 2 + R * Math.cos(angle),
+          y: H / 2 + R * Math.sin(angle),
+        };
       });
     }
 
     const lines = neighbors
       .map((n, i) => {
-        const p1 = pos["self"], p2 = pos[i];
-        const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+        const p1 = pos["self"],
+          p2 = pos[i];
+        const mx = (p1.x + p2.x) / 2,
+          my = (p1.y + p2.y) / 2;
         const c = snrColor(n.snr);
         const label = `${n.snr >= 0 ? "+" : ""}${n.snr.toFixed(0)} dB`;
         return `<line x1="${p1.x.toFixed(1)}" y1="${p1.y.toFixed(1)}" x2="${p2.x.toFixed(1)}" y2="${p2.y.toFixed(1)}" stroke="${c}" stroke-width="1.5" opacity="0.6"/>
@@ -3676,7 +4034,8 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       .join("\n");
 
     const sp = pos["self"];
-    const selfLabel = node.name.length > 8 ? node.name.slice(0, 8) + "…" : node.name;
+    const selfLabel =
+      node.name.length > 8 ? node.name.slice(0, 8) + "…" : node.name;
     const selfNode = `<circle cx="${sp.x.toFixed(1)}" cy="${sp.y.toFixed(1)}" r="11" fill="var(--primary-color,#3b82f6)" opacity="0.9" stroke="var(--card-background-color,#1a1a2e)" stroke-width="2"/>
 <text x="${sp.x.toFixed(1)}" y="${(sp.y + 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="#fff" font-weight="bold" font-family="sans-serif">${esc(selfLabel)}</text>`;
 
@@ -3843,9 +4202,10 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
               const bodyHtml = this._renderInlineMentions(parsed.body, myName);
               const metaHtml = this._renderMessageMeta(msg);
               const ack = group.own ? this._ackLevel(msg) : "";
-              const resendBtn = group.own && this._needsResend(msg)
-                ? `<button class="resend-btn" data-resend-idx="${idx}">↺ Resend</button>`
-                : "";
+              const resendBtn =
+                group.own && this._needsResend(msg)
+                  ? `<button class="resend-btn" data-resend-idx="${idx}">↺ Resend</button>`
+                  : "";
               const copyIconSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
               return `<div class="msg-row ${group.own ? "own" : ""} ${mentionsMe ? "mentions-me" : ""}" data-msg-idx="${idx}"><div class="msg-bubble"${ack ? ` data-ack="${ack}"` : ""}><span class="msg-text">${mentionChip}${bodyHtml}</span>${metaHtml}${resendBtn}</div><button class="reply-action" data-reply-idx="${idx}" title="Reply">${replyIconSvg}</button><button class="copy-action" data-copy-idx="${idx}" title="Copy message">${copyIconSvg}</button><span class="msg-time" title="${esc(formatTime(msg.ts))}">${relativeTime(msg.ts)}</span></div>`;
             })
@@ -3877,7 +4237,8 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         e.stopPropagation();
         const i = parseInt(btn.dataset.copyIdx, 10);
         const target = msgs[i];
-        if (target?.text) navigator.clipboard.writeText(target.text).catch(() => {});
+        if (target?.text)
+          navigator.clipboard.writeText(target.text).catch(() => {});
       });
     });
 
@@ -3944,7 +4305,8 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     if (m.message_type === "direct")
       return m.ack_received === true ? "confirmed" : "";
     if (m.message_type === "channel") {
-      const heard = (m.repeater_count > 0) ||
+      const heard =
+        m.repeater_count > 0 ||
         (Array.isArray(m.rx_log_data) && m.rx_log_data.length > 0);
       return heard ? "confirmed" : "";
     }
@@ -4434,8 +4796,11 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
 
     const cmd = flood ? "send_advert" : "send_advert false";
     try {
-      await this._hass.callService("meshcore", "execute_command",
-        this._svcData({ command: cmd }));
+      await this._hass.callService(
+        "meshcore",
+        "execute_command",
+        this._svcData({ command: cmd }),
+      );
       this._lastAdvertSent = Date.now();
       this._toast(
         flood ? "📡 Flood advert sent" : "📍 Zero-hop advert sent",
@@ -4472,14 +4837,25 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
   async _fetchDeviceSettings() {
     if (!this._hass) return;
     this._deviceSettings = { ...this._deviceSettings, loading: true };
-    if (this._settingsOpen && this._settingsTab === "device") this._renderSettingsModal();
+    if (this._pane === "settings" && this._settingsTab === "device")
+      this._renderSettingsPanel();
 
     // Read values from HA entity states/attributes synchronously — no commands needed.
     const states = this._hass.states || {};
-    const prefix = this._devicePrefix || this._config.device_prefix || this._settings.device_prefix;
-    let attrFirmware = null, attrHardware = null, attrPublicKey = null;
-    let sensorFreq = null, sensorBw = null, sensorSf = null, sensorCr = null;
-    let sensorTx = null, sensorLat = null, sensorLon = null;
+    const prefix =
+      this._devicePrefix ||
+      this._config.device_prefix ||
+      this._settings.device_prefix;
+    let attrFirmware = null,
+      attrHardware = null,
+      attrPublicKey = null;
+    let sensorFreq = null,
+      sensorBw = null,
+      sensorSf = null,
+      sensorCr = null;
+    let sensorTx = null,
+      sensorLat = null,
+      sensorLon = null;
     if (prefix) {
       for (const [id, st] of Object.entries(states)) {
         const isSensor = id.startsWith(`sensor.meshcore_${prefix}_`);
@@ -4487,73 +4863,108 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         if (!isSensor && !isBinary) continue;
         const a = st.attributes || {};
         const v = st.state;
-        if (!attrFirmware  && (a.firmware_version || a.fw_build || a.ver))
-          attrFirmware  = String(a.firmware_version ?? a.fw_build ?? a.ver).trim() || null;
-        if (!attrHardware  && (a.hardware || a.model || a.board))
-          attrHardware  = String(a.hardware ?? a.model ?? a.board).trim() || null;
+        if (!attrFirmware && (a.firmware_version || a.fw_build || a.ver))
+          attrFirmware =
+            String(a.firmware_version ?? a.fw_build ?? a.ver).trim() || null;
+        if (!attrHardware && (a.hardware || a.model || a.board))
+          attrHardware =
+            String(a.hardware ?? a.model ?? a.board).trim() || null;
         if (!attrPublicKey && a.public_key && a.public_key.length > 12)
           attrPublicKey = String(a.public_key).trim() || null;
         if (isSensor && v != null && v !== "unavailable" && v !== "unknown") {
           const base = `sensor.meshcore_${prefix}_`;
-          const slug = (metric) => id === `${base}${metric}` || id.startsWith(`${base}${metric}_`);
+          const slug = (metric) =>
+            id === `${base}${metric}` || id.startsWith(`${base}${metric}_`);
           const n = parseFloat(v);
           if (!isNaN(n)) {
-            if (!sensorFreq && slug("frequency"))        sensorFreq = n;
-            if (!sensorBw   && slug("bandwidth"))        sensorBw   = n;
-            if (!sensorSf   && slug("spreading_factor")) sensorSf   = n;
-            if (!sensorCr   && slug("coding_rate"))      sensorCr   = n;
-            if (!sensorTx   && slug("tx_power"))         sensorTx   = n;
-            if (!sensorLat  && slug("latitude"))         sensorLat  = n;
-            if (!sensorLon  && slug("longitude"))        sensorLon  = n;
+            if (!sensorFreq && slug("frequency")) sensorFreq = n;
+            if (!sensorBw && slug("bandwidth")) sensorBw = n;
+            if (!sensorSf && slug("spreading_factor")) sensorSf = n;
+            if (!sensorCr && slug("coding_rate")) sensorCr = n;
+            if (!sensorTx && slug("tx_power")) sensorTx = n;
+            if (!sensorLat && slug("latitude")) sensorLat = n;
+            if (!sensorLon && slug("longitude")) sensorLon = n;
           }
         }
       }
     }
 
     const [entriesR, devicesR] = await Promise.allSettled([
-      this._hass.connection.sendMessagePromise({ type: "config_entries/get", domain: "meshcore" }),
-      this._hass.connection.sendMessagePromise({ type: "config/device_registry/list" }),
+      this._hass.connection.sendMessagePromise({
+        type: "config_entries/get",
+        domain: "meshcore",
+      }),
+      this._hass.connection.sendMessagePromise({
+        type: "config/device_registry/list",
+      }),
     ]);
 
     // Connection type from config entries
     let connectionType = this._deviceSettings.connectionType;
     if (entriesR.status === "fulfilled") {
-      const entries = Array.isArray(entriesR.value) ? entriesR.value : (entriesR.value?.result ?? []);
+      const entries = Array.isArray(entriesR.value)
+        ? entriesR.value
+        : (entriesR.value?.result ?? []);
       const entryId = this._config.entry_id || this._settings.entry_id;
       const entry = entryId
         ? entries.find((e) => e.entry_id === entryId)
-        : entries.find((e) => e.domain === "meshcore") ?? entries[0];
+        : (entries.find((e) => e.domain === "meshcore") ?? entries[0]);
       if (entry) {
         const d = entry.data || {};
-        if (d.host)         connectionType = `TCP — ${d.host}:${d.port ?? 4403}`;
-        else if (d.device)  connectionType = `USB — ${d.device}`;
+        if (d.host) connectionType = `TCP — ${d.host}:${d.port ?? 4403}`;
+        else if (d.device) connectionType = `USB — ${d.device}`;
         else if (d.address) connectionType = `BLE — ${d.address}`;
-        else if (d.connection_type || d.type) connectionType = String(d.connection_type ?? d.type);
-        else                connectionType = entry.title ?? "—";
+        else if (d.connection_type || d.type)
+          connectionType = String(d.connection_type ?? d.type);
+        else connectionType = entry.title ?? "—";
       }
     }
 
     const cleanHaName = (s) => {
       if (!s) return null;
-      return s.replace(/^meshcore\s+/i, "").replace(/\s*\([0-9a-f]{6,}\)\s*$/i, "").trim() || null;
+      return (
+        s
+          .replace(/^meshcore\s+/i, "")
+          .replace(/\s*\([0-9a-f]{6,}\)\s*$/i, "")
+          .trim() || null
+      );
     };
 
     // Device registry — sw_version = firmware, model = hardware, name = device name
-    let regFirmware = null, regHardware = null, regDeviceName = null;
+    let regFirmware = null,
+      regHardware = null,
+      regDeviceName = null;
     if (devicesR.status === "fulfilled") {
-      const devices = devicesR.value?.devices ?? devicesR.value?.result?.devices ?? devicesR.value ?? [];
-      const cfgEntries = entriesR.status === "fulfilled"
-        ? (Array.isArray(entriesR.value) ? entriesR.value : entriesR.value?.result ?? [])
-        : [];
+      const devices =
+        devicesR.value?.devices ??
+        devicesR.value?.result?.devices ??
+        devicesR.value ??
+        [];
+      const cfgEntries =
+        entriesR.status === "fulfilled"
+          ? Array.isArray(entriesR.value)
+            ? entriesR.value
+            : (entriesR.value?.result ?? [])
+          : [];
       const entryId = this._config.entry_id || this._settings.entry_id;
-      const meshcoreEntryIds = new Set(cfgEntries.filter((e) => e.domain === "meshcore").map((e) => e.entry_id));
-      const dev = Array.isArray(devices) && devices.find((d) =>
-        (entryId && d.config_entries?.includes(entryId)) ||
-        (!entryId && d.config_entries?.some?.((e) => meshcoreEntryIds.has(e)))
+      const meshcoreEntryIds = new Set(
+        cfgEntries
+          .filter((e) => e.domain === "meshcore")
+          .map((e) => e.entry_id),
       );
+      const dev =
+        Array.isArray(devices) &&
+        devices.find(
+          (d) =>
+            (entryId && d.config_entries?.includes(entryId)) ||
+            (!entryId &&
+              d.config_entries?.some?.((e) => meshcoreEntryIds.has(e))),
+        );
       if (dev) {
-        regFirmware   = dev.sw_version ? String(dev.sw_version).trim() || null : null;
-        regHardware   = dev.model      ? String(dev.model).trim()      || null : null;
+        regFirmware = dev.sw_version
+          ? String(dev.sw_version).trim() || null
+          : null;
+        regHardware = dev.model ? String(dev.model).trim() || null : null;
         regDeviceName = cleanHaName(String(dev.name_by_user ?? dev.name ?? ""));
       }
     }
@@ -4561,7 +4972,9 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     // Config entry title as device name fallback
     const cfgEntryTitle = (() => {
       if (entriesR.status !== "fulfilled") return null;
-      const entries = Array.isArray(entriesR.value) ? entriesR.value : (entriesR.value?.result ?? []);
+      const entries = Array.isArray(entriesR.value)
+        ? entriesR.value
+        : (entriesR.value?.result ?? []);
       const entryId = this._config.entry_id || this._settings.entry_id;
       const entry = entryId
         ? entries.find((e) => e.entry_id === entryId)
@@ -4574,88 +4987,43 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       if (!prefix) return null;
       const st = states[`binary_sensor.meshcore_${prefix}_messages`];
       if (!st) return null;
-      return cleanHaName((st.attributes?.friendly_name || "").replace(/\s*messages\s*$/i, ""));
+      return cleanHaName(
+        (st.attributes?.friendly_name || "").replace(/\s*messages\s*$/i, ""),
+      );
     })();
 
     this._deviceSettings = {
       loading: false,
-      deviceName:  regDeviceName ?? sensorFriendlyName ?? cfgEntryTitle ?? this._deviceSettings.deviceName,
-      firmware:    regFirmware ?? attrFirmware ?? this._deviceSettings.firmware,
-      hardware:    regHardware ?? attrHardware ?? this._deviceSettings.hardware,
-      publicKey:   attrPublicKey ?? this._deviceSettings.publicKey,
+      deviceName:
+        regDeviceName ??
+        sensorFriendlyName ??
+        cfgEntryTitle ??
+        this._deviceSettings.deviceName,
+      firmware: regFirmware ?? attrFirmware ?? this._deviceSettings.firmware,
+      hardware: regHardware ?? attrHardware ?? this._deviceSettings.hardware,
+      publicKey: attrPublicKey ?? this._deviceSettings.publicKey,
       connectionType,
-      radioFreq:   sensorFreq ?? this._deviceSettings.radioFreq,
-      radioBw:     sensorBw   ?? this._deviceSettings.radioBw,
-      radioSf:     sensorSf   ?? this._deviceSettings.radioSf,
-      radioCr:     sensorCr   ?? this._deviceSettings.radioCr,
-      txPower:     sensorTx   ?? this._deviceSettings.txPower,
-      rxGain:      this._deviceSettings.rxGain,
-      dutyCycle:   this._deviceSettings.dutyCycle,
-      lat:         sensorLat  ?? this._deviceSettings.lat,
-      lon:         sensorLon  ?? this._deviceSettings.lon,
-      pathHashMode:  this._deviceSettings.pathHashMode,
-      regionDefault: this._deviceSettings.regionDefault,
+      radioFreq: sensorFreq ?? this._deviceSettings.radioFreq,
+      radioBw: sensorBw ?? this._deviceSettings.radioBw,
+      radioSf: sensorSf ?? this._deviceSettings.radioSf,
+      radioCr: sensorCr ?? this._deviceSettings.radioCr,
+      txPower: sensorTx ?? this._deviceSettings.txPower,
+      rxGain: this._deviceSettings.rxGain,
+      lat: sensorLat ?? this._deviceSettings.lat,
+      lon: sensorLon ?? this._deviceSettings.lon,
+      pathHashMode: this._deviceSettings.pathHashMode,
     };
-    if (this._settingsOpen && this._settingsTab === "device") this._renderSettingsModal();
+    if (this._pane === "settings" && this._settingsTab === "device")
+      this._renderSettingsPanel();
   }
 
   _openSettings(tab) {
-    this._settingsOpen = true;
-    this._applyStatus = null;
-    // Pull the live contact list so the Contacts tab can show device-truth
-    // add/remove buttons. Fire-and-forget — the modal renders an initial
-    // skeleton from cached state and re-renders when the response arrives.
-    this._refreshContactsFromService();
     if (tab) this._settingsTab = tab;
-    // Snapshot current settings into draft (so Cancel can revert).
-    this._draftSettings = {
-      node_name: this._settings.node_name ?? this._config.node_name ?? "",
-      device_prefix:
-        this._settings.device_prefix ??
-        this._config.device_prefix ??
-        this._devicePrefix ??
-        "",
-      entry_id: this._settings.entry_id ?? this._config.entry_id ?? "",
-      max_messages:
-        this._settings.max_messages ?? this._config.max_messages ?? 200,
-      history_hours:
-        this._settings.history_hours ?? this._config.history_hours ?? 24,
-      default_pane:
-        this._settings.default_pane ?? this._config.default_pane ?? "chats",
-      compact: this._settings.compact ?? this._config.compact ?? false,
-      height: this._settings.height ?? this._config.height ?? "",
-      show_hops: this._showHops,
-    };
-    // Channels/contacts draft starts from currently-discovered names (pre-filled
-    // with everything visible) so the user can edit/rename without typing them in.
-    this._draftChannels =
-      this._settings.channels && this._settings.channels.length
-        ? this._settings.channels.map((c) => ({ ...c }))
-        : this._discoveredChannels.map((c) => ({ idx: c.idx, name: c.name }));
-    this._draftContacts =
-      this._settings.contacts && this._settings.contacts.length
-        ? this._settings.contacts.map((c) => ({ ...c }))
-        : this._discoveredContacts.map((c) => ({
-            pubkey_prefix: c.pubkey_prefix,
-            name: c.name,
-          }));
-    // Snapshot the idxs that already existed when the modal opened — only
-    // these can ever be "stale" (a brand-new row the user adds via "+ Add
-    // channel" hasn't been pushed to the device yet, so flagging it as stale
-    // would be a UX bug, not a data state).
-    this._knownChannelIdxsAtOpen = new Set(
-      this._discoveredChannels.map((c) => c.idx),
-    );
-    this._renderSettingsModal();
-    this._fetchDeviceSettings();
+    this._setPane("settings");
   }
 
   _closeSettings() {
-    this._settingsOpen = false;
-    this._draftSettings = null;
-    this._draftChannels = null;
-    this._draftContacts = null;
-    this._renderSettingsModal();
+    this._setPane("chats");
   }
 
   _commitSettings() {
@@ -4703,27 +5071,16 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     this._mergeSettingsIntoConfig();
     this._applyHeightVar();
 
-    // Re-discover with new prefix/overrides, then re-render the underlying
-    // card. The settings modal STAYS OPEN so the user can keep tweaking —
-    // we render it last to refresh any draft-derived UI (e.g. discovered
-    // counts in the About tab).
     this._discoverFromHass();
-    // Re-pick the host element and re-mount the card content; the modal-root
-    // div is part of the same render so we have to re-open it explicitly.
-    const wasTab = this._settingsTab;
+    // Re-render with settings pane still active.
     this._render();
-    this._settingsOpen = true;
-    this._settingsTab = wasTab;
-    // Bump the saved-at marker so the modal can show "✓ Saved just now".
     this._settingsSavedAt = Date.now();
-    this._renderSettingsModal();
-    // Drop the pill after the fade completes so a stale class doesn't linger.
+    this._renderSettingsPanel();
     if (this._savedPillTimer) clearTimeout(this._savedPillTimer);
     this._savedPillTimer = setTimeout(() => {
       this._settingsSavedAt = null;
-      if (this._settingsOpen) this._renderSettingsModal();
+      if (this._pane === "settings") this._renderSettingsPanel();
     }, 4000);
-    // Brief confirmation toast for users who scroll past the inline indicator.
     this._toast("✓ Settings saved", "ok");
   }
 
@@ -4789,8 +5146,11 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         // channel names with spaces or shell metacharacters (#, $, etc.)
         // round-trip cleanly. shlex respects double-quoted strings.
         const safeName = `"${name.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-        await this._hass.callService("meshcore", "execute_command",
-          this._svcData({ command: `set_channel ${idx} ${safeName} ${hash}` }));
+        await this._hass.callService(
+          "meshcore",
+          "execute_command",
+          this._svcData({ command: `set_channel ${idx} ${safeName} ${hash}` }),
+        );
         status.ok++;
         status.applied.push({ idx, name });
       } catch (err) {
@@ -4848,13 +5208,9 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     return status;
   }
 
-  _renderSettingsModal() {
-    const root = this.shadowRoot.getElementById("modal-root");
+  _renderSettingsPanel() {
+    const root = this.shadowRoot.getElementById("panel-settings");
     if (!root) return;
-    if (!this._settingsOpen) {
-      root.innerHTML = "";
-      return;
-    }
 
     const tab = this._settingsTab;
     const d = this._draftSettings || {};
@@ -4871,60 +5227,38 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     else if (tab === "contacts") body = this._renderContactsEditor();
     else if (tab === "about") body = this._renderAboutPane();
 
-    const existingDialog = root.querySelector("ha-dialog");
-
-    const footerHtml = () => `
+    const footerHtml = `
       <div class="modal-footer">
-        ${this._settingsSavedAt && Date.now() - this._settingsSavedAt < 4000
-          ? `<span class="saved-pill">✓ Saved</span>` : ""}
-        ${tab === "channels"
-          ? `<button class="modal-btn secondary" data-action="apply-channels-device">Apply to device</button>` : ""}
+        ${
+          this._settingsSavedAt && Date.now() - this._settingsSavedAt < 4000
+            ? `<span class="saved-pill">✓ Saved</span>`
+            : ""
+        }
+        ${
+          tab === "channels"
+            ? `<button class="modal-btn secondary" data-action="apply-channels-device">Apply to device</button>`
+            : ""
+        }
         <div class="spacer"></div>
-        <button class="modal-btn secondary" data-action="close-settings">Close</button>
         <button class="modal-btn primary" data-action="save-settings">Save</button>
       </div>`;
 
-    if (existingDialog) {
-      existingDialog.querySelectorAll(".modal-tab").forEach((btn) => {
-        btn.classList.toggle("active", btn.dataset.tab === tab);
-      });
-      existingDialog.querySelector(".modal-body").innerHTML = body;
-      existingDialog.querySelector(".modal-footer").outerHTML = footerHtml();
-    } else {
-      // First open — create the dialog and wire persistent listeners.
-      root.innerHTML = `
-        <ha-dialog open heading="Companion settings">
-          ${tabsHtml}
-          <div class="modal-body">${body}</div>
-          ${footerHtml()}
-        </ha-dialog>`;
+    root.innerHTML = `${tabsHtml}<div class="modal-body">${body}</div>${footerHtml}`;
 
-      root.querySelector("ha-dialog").addEventListener("closed", () => {
-        if (this._settingsOpen) this._closeSettings();
-      });
-    }
-
-    // Close button (re-wired each render because the node is recreated).
-    root
-      .querySelector('[data-action="close-settings"]')
-      .addEventListener("click", () => this._closeSettings());
-
-    // Tab switching — wired only on first open (dialog persists across tab changes)
-    if (!existingDialog) {
-      root.querySelector(".modal-tabs").addEventListener("click", (e) => {
-        const btn = e.target.closest(".modal-tab");
-        if (!btn) return;
-        const newTab = btn.dataset.tab;
-        if (!newTab || newTab === this._settingsTab) return;
-        this._captureFormDraft(root);
-        if (newTab !== "channels") this._applyStatus = null;
-        if (newTab !== "contacts") this._contactStatus = null;
-        this._settingsTab = newTab;
-        if (newTab === "contacts") this._refreshContactsFromService();
-        if (newTab === "device") this._fetchDeviceSettings();
-        this._renderSettingsModal();
-      });
-    }
+    // Tab switching
+    root.querySelector(".modal-tabs").addEventListener("click", (e) => {
+      const btn = e.target.closest(".modal-tab");
+      if (!btn) return;
+      const newTab = btn.dataset.tab;
+      if (!newTab || newTab === this._settingsTab) return;
+      this._captureFormDraft(root);
+      if (newTab !== "channels") this._applyStatus = null;
+      if (newTab !== "contacts") this._contactStatus = null;
+      this._settingsTab = newTab;
+      if (newTab === "contacts") this._refreshContactsFromService();
+      if (newTab === "device") this._fetchDeviceSettings();
+      this._renderSettingsPanel();
+    });
 
     // Save
     root
@@ -4970,10 +5304,9 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
               }
             }
           }
-          this._renderSettingsModal();
+          this._renderSettingsPanel();
         }
       });
-
 
     this._wireFormHandlers(root);
   }
@@ -5158,7 +5491,6 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       </div>`;
   }
 
-
   _renderContactsEditor() {
     const haveLive = Array.isArray(this._serviceContacts);
     const live = this._serviceContacts || [];
@@ -5179,7 +5511,9 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       const initials = (c.name[0] || "?").toUpperCase();
       const colour = colorForName(c.name);
       const pk = esc(c.pubkey_prefix || c.pubkey);
-      const extraMeta = onDevice ? "" : ` · ${esc(c.last_advert ? `seen ${relativeTime(c.last_advert * 1000)} ago` : "never seen")}`;
+      const extraMeta = onDevice
+        ? ""
+        : ` · ${esc(c.last_advert ? `seen ${relativeTime(c.last_advert * 1000)} ago` : "never seen")}`;
       const btn = onDevice
         ? `<button class="contact-action danger" data-action="remove-contact-device" data-pk="${pk}">Remove</button>`
         : `<button class="contact-action accent" data-action="add-contact-device" data-pk="${pk}">Add</button>`;
@@ -5199,7 +5533,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         </div>
         ${
           onDevice.length
-            ? `<div class="contact-list">${onDevice.map(c => contactRow(c, true)).join("")}</div>`
+            ? `<div class="contact-list">${onDevice.map((c) => contactRow(c, true)).join("")}</div>`
             : `<div class="empty-list" style="padding:14px">${haveLive ? "No contacts saved on this device yet." : "Loading…"}</div>`
         }
       </div>`;
@@ -5212,7 +5546,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         </div>
         ${
           discovered.length
-            ? `<div class="contact-list">${discovered.map(c => contactRow(c, false)).join("")}</div>`
+            ? `<div class="contact-list">${discovered.map((c) => contactRow(c, false)).join("")}</div>`
             : `<div class="empty-list" style="padding:14px">No discovered contacts ${haveLive ? "" : "yet"}.</div>`
         }
       </div>`;
@@ -5253,15 +5587,23 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
 
     // ── Info section ─────────────────────────────────────────────────────────
     const infoRows = [
-      ["Firmware",   ds.firmware    ?? (loading ? "…" : "—")],
-      ["Hardware",   ds.hardware    ?? (loading ? "…" : "—")],
+      ["Firmware", ds.firmware ?? (loading ? "…" : "—")],
+      ["Hardware", ds.hardware ?? (loading ? "…" : "—")],
       ["Connection", ds.connectionType ?? (loading ? "…" : "—")],
-      ["Public key", ds.publicKey
-        ? `<span class="device-pubkey" title="${esc(ds.publicKey)}">${esc(ds.publicKey.slice(0, 24))}…</span>`
-        : (loading ? "…" : "—")],
-    ].map(([k, v]) =>
-      `<div class="kv"><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`
-    ).join("");
+      [
+        "Public key",
+        ds.publicKey
+          ? `<span class="device-pubkey" title="${esc(ds.publicKey)}">${esc(ds.publicKey.slice(0, 24))}…</span>`
+          : loading
+            ? "…"
+            : "—",
+      ],
+    ]
+      .map(
+        ([k, v]) =>
+          `<div class="kv"><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`,
+      )
+      .join("");
 
     const infoSection = `
       <div class="device-section">
@@ -5308,22 +5650,13 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
           <div class="dvc-row">
             <label>RX boost gain
               <select id="rx-gain-select"${dis}>
-                <option value="on"  ${ds.rxGain === "on"  ? "selected" : ""}>on</option>
-                <option value="off" ${ds.rxGain !== "on"  ? "selected" : ""}>off</option>
+                <option value="on"  ${ds.rxGain === "on" ? "selected" : ""}>on</option>
+                <option value="off" ${ds.rxGain !== "on" ? "selected" : ""}>off</option>
               </select>
             </label>
             <button class="settings-action-btn" id="rx-gain-apply"${dis}>Apply</button>
           </div>
           <div class="help">Boosted receive gain (SX1262/SX1268 only).</div>
-        </div>
-        <div class="dvc-field">
-          <div class="dvc-row">
-            <label>Duty cycle (%)
-              <input type="number" id="dutycycle" min="1" max="100" value="${ds.dutyCycle ?? ""}" placeholder="1–100"${dis} />
-            </label>
-            <button class="settings-action-btn" id="dutycycle-apply"${dis}>Apply</button>
-          </div>
-          <div class="help">Long-term TX duty cycle limit. 100 = no limit, 50 = default.</div>
         </div>
       </div>`;
 
@@ -5360,16 +5693,6 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
           </div>
           <div class="help">Hash size in advert broadcasts. Modes 1–2 require fw ≥ 1.14 on all repeaters.</div>
         </div>
-        <div class="dvc-field">
-          <div class="dvc-row">
-            <label>Default scope region
-              <input type="text" id="region-default-input" value="${esc(ds.regionDefault ?? "")}" placeholder="e.g. #Europe (empty = global)"${dis} />
-            </label>
-            <button class="settings-action-btn" id="region-default-apply"${dis}>Apply</button>
-            <button class="settings-action-btn" id="region-default-clear">Clear</button>
-          </div>
-          <div class="help">Default region scope for outgoing messages.</div>
-        </div>
       </div>`;
 
     // ── Actions section ──────────────────────────────────────────────────────
@@ -5404,13 +5727,19 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         </div>
         ${[
           ["Detected device prefix", esc(dev)],
-          ["Discovered channels",    chCount],
+          ["Discovered channels", chCount],
           ["Discovered DM contacts", dmCount],
-          ["Discovered nodes",       nodeCount],
-          ["Settings storage",       `<span style="word-break:break-all">${esc(this._settingsKey())}</span>`],
-        ].map(([k, v]) =>
-          `<div class="kv"><div class="k" style="color:var(--text3);min-width:160px">${k}</div><div class="v" style="color:var(--text)">${v}</div></div>`
-        ).join("")}
+          ["Discovered nodes", nodeCount],
+          [
+            "Settings storage",
+            `<span style="word-break:break-all">${esc(this._settingsKey())}</span>`,
+          ],
+        ]
+          .map(
+            ([k, v]) =>
+              `<div class="kv"><div class="k" style="color:var(--text3);min-width:160px">${k}</div><div class="v" style="color:var(--text)">${v}</div></div>`,
+          )
+          .join("")}
       </div>`;
   }
 
@@ -5419,7 +5748,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     const general = root.querySelector('[data-form="general"]');
     if (general) {
       const get = (name) => general.querySelector(`[name="${name}"]`);
-      const getVal = (el) => el ? el.value : undefined;
+      const getVal = (el) => (el ? el.value : undefined);
       const fields = [
         "node_name",
         "device_prefix",
@@ -5441,9 +5770,13 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       const hh = num("history_hours");
       if (hh !== undefined) this._draftSettings.history_hours = hh;
       const cb = get("compact");
-      if (cb) this._draftSettings.compact = "checked" in cb ? cb.checked : cb.value === "on";
+      if (cb)
+        this._draftSettings.compact =
+          "checked" in cb ? cb.checked : cb.value === "on";
       const sh = get("show_hops");
-      if (sh) this._draftSettings.show_hops = "checked" in sh ? sh.checked : sh.value === "on";
+      if (sh)
+        this._draftSettings.show_hops =
+          "checked" in sh ? sh.checked : sh.value === "on";
     }
     const chList = root.querySelector('[data-list="channels"]');
     if (chList) {
@@ -5467,7 +5800,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     // Live-capture every field edit so navigation buttons don't drop typed input.
     root
       .querySelectorAll(
-        ".modal-body input, .modal-body ha-checkbox, .modal-body select"
+        ".modal-body input, .modal-body ha-checkbox, .modal-body select",
       )
       .forEach((el) => {
         el.addEventListener("input", () => this._captureFormDraft(root));
@@ -5483,7 +5816,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         } else if (this._settingsTab === "contacts" && this._draftContacts) {
           this._draftContacts.splice(i, 1);
         }
-        this._renderSettingsModal();
+        this._renderSettingsPanel();
       });
     });
     // Add-row buttons
@@ -5502,7 +5835,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
           ...(this._draftChannels || []),
           { idx: nextIdx, name: "" },
         ];
-        this._renderSettingsModal();
+        this._renderSettingsPanel();
       });
     const addCt = root.querySelector('[data-action="add-contact-row"]');
     if (addCt)
@@ -5512,7 +5845,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
           ...(this._draftContacts || []),
           { pubkey_prefix: "", name: "" },
         ];
-        this._renderSettingsModal();
+        this._renderSettingsPanel();
       });
 
     // Stale-entity cleanup actions (channels tab)
@@ -5529,7 +5862,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
             (r) => parseInt(r.idx, 10) !== idx,
           );
         }
-        this._renderSettingsModal();
+        this._renderSettingsPanel();
       });
     });
     root.querySelectorAll('[data-action="delete-orphan"]').forEach((btn) => {
@@ -5563,7 +5896,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
             // rediscovery now so the sidebar stops showing it.
             this._discoverFromHass();
           }
-          this._renderSettingsModal();
+          this._renderSettingsPanel();
           this._renderSidebar();
         } catch (err) {
           alert(`Failed to delete ${entityId}: ${err?.message || err}`);
@@ -5599,7 +5932,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
           }
           btn.disabled = false;
           btn.textContent = prev;
-          this._renderSettingsModal();
+          this._renderSettingsPanel();
         });
       });
     root
@@ -5633,7 +5966,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
           }
           btn.disabled = false;
           btn.textContent = prev;
-          this._renderSettingsModal();
+          this._renderSettingsPanel();
         });
       });
     const refreshBtn = root.querySelector('[data-action="refresh-contacts"]');
@@ -5653,15 +5986,26 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
   _wireDeviceHandlers(root) {
     if (this._settingsTab !== "device") return;
 
-    const cmd = async (c) => this._hass.callService("meshcore", "execute_command",
-      this._svcData({ command: c }), undefined, false, true);
+    const cmd = async (c) =>
+      this._hass.callService(
+        "meshcore",
+        "execute_command",
+        this._svcData({ command: c }),
+        undefined,
+        false,
+        true,
+      );
 
     const withBtn = async (btn, label, fn) => {
       if (!btn) return;
       btn.disabled = true;
       const prev = btn.textContent;
       btn.textContent = label;
-      try { await fn(); } catch (err) { this._toast(`✗ ${err?.message || err}`, "err"); }
+      try {
+        await fn();
+      } catch (err) {
+        this._toast(`✗ ${err?.message || err}`, "err");
+      }
       btn.disabled = false;
       btn.textContent = prev;
     };
@@ -5673,33 +6017,49 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
 
     // Device name
     root.querySelector("#device-name-apply")?.addEventListener("click", () =>
-      withBtn(root.querySelector("#device-name-apply"), "Applying…", async () => {
-        const val = root.querySelector("#device-name-input")?.value?.trim();
-        if (!val) return;
-        await cmd(`set name ${val}`);
-        this._deviceSettings.deviceName = val;
-        this._toast(`✓ Name set to "${val}"`, "ok");
-      })
+      withBtn(
+        root.querySelector("#device-name-apply"),
+        "Applying…",
+        async () => {
+          const val = root.querySelector("#device-name-input")?.value?.trim();
+          if (!val) return;
+          await cmd(`set name ${val}`);
+          this._deviceSettings.deviceName = val;
+          this._toast(`✓ Name set to "${val}"`, "ok");
+        },
+      ),
     );
 
     // Public key — click to copy full key
     root.querySelector(".device-pubkey")?.addEventListener("click", () => {
       const pk = this._deviceSettings.publicKey;
-      if (pk) navigator.clipboard.writeText(pk).then(() => this._toast("✓ Public key copied", "ok")).catch(() => {});
+      if (pk)
+        navigator.clipboard
+          .writeText(pk)
+          .then(() => this._toast("✓ Public key copied", "ok"))
+          .catch(() => {});
     });
 
     // Radio freq/bw/sf/cr
     root.querySelector("#radio-apply")?.addEventListener("click", () =>
       withBtn(root.querySelector("#radio-apply"), "Applying…", async () => {
         const freq = root.querySelector("#radio-freq")?.value;
-        const bw   = root.querySelector("#radio-bw")?.value;
-        const sf   = root.querySelector("#radio-sf")?.value;
-        const cr   = root.querySelector("#radio-cr")?.value;
-        if (!freq || !bw || !sf || !cr) { this._toast("Fill all 4 radio fields", "err"); return; }
+        const bw = root.querySelector("#radio-bw")?.value;
+        const sf = root.querySelector("#radio-sf")?.value;
+        const cr = root.querySelector("#radio-cr")?.value;
+        if (!freq || !bw || !sf || !cr) {
+          this._toast("Fill all 4 radio fields", "err");
+          return;
+        }
         await cmd(`set_radio ${freq},${bw},${sf},${cr}`);
-        Object.assign(this._deviceSettings, { radioFreq: parseFloat(freq), radioBw: parseFloat(bw), radioSf: parseInt(sf), radioCr: parseInt(cr) });
+        Object.assign(this._deviceSettings, {
+          radioFreq: parseFloat(freq),
+          radioBw: parseFloat(bw),
+          radioSf: parseInt(sf),
+          radioCr: parseInt(cr),
+        });
         this._toast("✓ Radio params applied — reboot required", "ok");
-      })
+      }),
     );
 
     // TX power
@@ -5710,7 +6070,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         await cmd(`set_tx_power ${val}`);
         this._deviceSettings.txPower = parseInt(val);
         this._toast(`✓ TX power set to ${val} dBm`, "ok");
-      })
+      }),
     );
 
     // RX gain
@@ -5720,74 +6080,66 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         await cmd(`set radio.rxgain ${val}`);
         this._deviceSettings.rxGain = val;
         this._toast(`✓ RX gain set to ${val}`, "ok");
-      })
+      }),
     );
 
-    // Duty cycle
-    root.querySelector("#dutycycle-apply")?.addEventListener("click", () =>
-      withBtn(root.querySelector("#dutycycle-apply"), "Applying…", async () => {
-        const val = root.querySelector("#dutycycle")?.value;
-        if (!val) return;
-        await cmd(`set dutycycle ${val}`);
-        this._deviceSettings.dutyCycle = parseFloat(val);
-        this._toast(`✓ Duty cycle set to ${val}%`, "ok");
-      })
-    );
 
     // Location
     root.querySelector("#loc-apply")?.addEventListener("click", () =>
       withBtn(root.querySelector("#loc-apply"), "Applying…", async () => {
         const lat = root.querySelector("#loc-lat")?.value;
         const lon = root.querySelector("#loc-lon")?.value;
-        if (lat === "" || lon === "") { this._toast("Enter both lat and lon", "err"); return; }
+        if (lat === "" || lon === "") {
+          this._toast("Enter both lat and lon", "err");
+          return;
+        }
         await cmd(`set lat ${lat}`);
         await cmd(`set lon ${lon}`);
         this._deviceSettings.lat = parseFloat(lat);
         this._deviceSettings.lon = parseFloat(lon);
         this._toast("✓ Location updated", "ok");
-      })
+      }),
     );
 
     // Path hash mode
     root.querySelector("#path-hash-mode-apply")?.addEventListener("click", () =>
-      withBtn(root.querySelector("#path-hash-mode-apply"), "Applying…", async () => {
-        const val = parseInt(root.querySelector("#path-hash-mode-select")?.value ?? "0", 10);
-        await cmd(`set path.hash.mode ${val}`);
-        this._deviceSettings.pathHashMode = val;
-        this._toast(`✓ Path hash mode set to ${val}`, "ok");
-      })
+      withBtn(
+        root.querySelector("#path-hash-mode-apply"),
+        "Applying…",
+        async () => {
+          const val = parseInt(
+            root.querySelector("#path-hash-mode-select")?.value ?? "0",
+            10,
+          );
+          await cmd(`set path.hash.mode ${val}`);
+          this._deviceSettings.pathHashMode = val;
+          this._toast(`✓ Path hash mode set to ${val}`, "ok");
+        },
+      ),
     );
 
-    // Region default
-    const rdInput = root.querySelector("#region-default-input");
-    const applyRegion = async (value) => {
-      const btnId = value === null ? "#region-default-clear" : "#region-default-apply";
-      withBtn(root.querySelector(btnId), "Applying…", async () => {
-        await cmd(value ? `region default ${value}` : "region default <null>");
-        this._deviceSettings.regionDefault = value ?? "";
-        this._toast(value ? `✓ Region set to ${value}` : "✓ Region cleared", "ok");
-      });
-    };
-    root.querySelector("#region-default-apply")?.addEventListener("click", () =>
-      applyRegion(rdInput?.value?.trim() || null));
-    root.querySelector("#region-default-clear")?.addEventListener("click", () =>
-      applyRegion(null));
 
     // Time sync
-    const timeSyncBtn    = root.querySelector("#time-sync-btn");
+    const timeSyncBtn = root.querySelector("#time-sync-btn");
     const timeSyncStatus = root.querySelector("#time-sync-status");
     timeSyncBtn?.addEventListener("click", () =>
       withBtn(timeSyncBtn, "Syncing…", async () => {
         if (timeSyncStatus) timeSyncStatus.textContent = "";
         const ts = Math.floor(Date.now() / 1000);
-        await this._hass.callService("meshcore", "execute_command",
-          this._svcData({ command: `set_time ${ts}` }), undefined, false, true);
+        await this._hass.callService(
+          "meshcore",
+          "execute_command",
+          this._svcData({ command: `set_time ${ts}` }),
+          undefined,
+          false,
+          true,
+        );
         if (timeSyncStatus) {
           timeSyncStatus.textContent = "✓ Synced";
           timeSyncStatus.style.color = "var(--success-color, #4ade80)";
         }
         this._toast("⏱ Device time synced", "ok");
-      })
+      }),
     );
   }
 
@@ -5976,9 +6328,13 @@ class MeshcoreChatCardEditor extends HTMLElement {
     if (!out.contacts.length) delete out.contacts;
 
     this._emitting = true;
-    this.dispatchEvent(new CustomEvent("config-changed", {
-      detail: { config: out }, bubbles: true, composed: true,
-    }));
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config: out },
+        bubbles: true,
+        composed: true,
+      }),
+    );
     this._emitting = false;
   }
 
@@ -6150,7 +6506,6 @@ class MeshcoreChatCardEditor extends HTMLElement {
         this._emit();
       });
   }
-
 }
 
 customElements.define("meshcore-chat-card-editor", MeshcoreChatCardEditor);
