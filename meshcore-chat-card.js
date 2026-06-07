@@ -706,10 +706,93 @@ const STYLE = `
     color: #fff;
     flex-shrink: 0;
   }
+  .chat-header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
   .chat-header-name {
     font-size: 15px;
     font-weight: 700;
     color: var(--text);
+  }
+  /* ── Scope picker row (channel header) ── */
+  .scope-row {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .scope-select {
+    font-size: 10px;
+    color: var(--text3);
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    padding: 1px 3px;
+    cursor: pointer;
+    max-width: 130px;
+    outline: none;
+    font-family: inherit;
+  }
+  .scope-select:hover, .scope-select:focus {
+    background: var(--bg3, rgba(255,255,255,0.08));
+    color: var(--text2);
+  }
+  .scope-add-btn {
+    background: none;
+    border: none;
+    padding: 0 4px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--text3);
+    border-radius: 4px;
+  }
+  .scope-add-btn:hover { color: var(--accent); }
+  .scope-new-input {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--bg3, var(--bg));
+    color: var(--text);
+    width: 88px;
+    outline: none;
+    font-family: inherit;
+  }
+  .scope-new-confirm {
+    background: none;
+    border: none;
+    padding: 0 4px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--accent);
+    border-radius: 4px;
+    line-height: 1;
+  }
+  /* Sidebar channel scope badge */
+  .scope-badge {
+    display: inline-block;
+    margin-left: 5px;
+    font-size: 9px;
+    padding: 0 4px;
+    border-radius: 6px;
+    background: rgba(var(--rgb-primary-color, 56,189,248), 0.15);
+    color: var(--accent);
+    vertical-align: middle;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  /* Scope chip in message meta footer */
+  .meta-scope {
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 6px;
+    background: rgba(var(--rgb-primary-color, 56,189,248), 0.12);
+    color: var(--accent);
+    white-space: nowrap;
+    font-weight: 600;
   }
   .chat-header-sub {
     font-size: 12px;
@@ -925,13 +1008,42 @@ const STYLE = `
   .msg-meta .meta-rp.more {
     background: rgba(var(--rgb-secondary-text-color, 148,163,184), 0.06);
     color: var(--text3);
+    cursor: default;
+    position: relative;
+  }
+  .msg-meta .meta-rp.more:hover { color: var(--text2); }
+  .meta-rp-overflow {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 0;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 6px 8px;
+    min-width: 120px;
+    z-index: 50;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    display: none;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .msg-meta .meta-rp.more:hover .meta-rp-overflow {
+    display: flex;
+  }
+  .meta-rp-overflow-item {
+    font-size: 11px;
+    color: var(--text2);
+    padding: 2px 4px;
+    border-radius: 4px;
+    white-space: nowrap;
   }
   .msg-row.own .msg-meta {
-    color: rgba(125,211,252,0.65);
-    border-top-color: rgba(125,211,252,0.20);
+    color: rgba(var(--rgb-primary-color, 125,211,252), 0.65);
+    border-top-color: rgba(var(--rgb-primary-color, 125,211,252), 0.20);
   }
   .msg-row.own .msg-meta .meta-rp {
-    background: rgba(125,211,252,0.16);
+    background: rgba(var(--rgb-primary-color, 125,211,252), 0.16);
     color: var(--own-text);
   }
 
@@ -1058,18 +1170,23 @@ const STYLE = `
     background: var(--bg2);
     display: flex;
     gap: 8px;
-    align-items: center;
+    align-items: flex-end;
   }
   .msg-input {
     flex: 1;
     background: var(--bg3);
     border: 1px solid var(--border);
-    border-radius: 20px;
+    border-radius: 14px;
     padding: 9px 14px;
     color: var(--text);
     font-size: 13.5px;
+    line-height: 1.45;
     outline: none;
     font-family: inherit;
+    resize: none;
+    min-height: 38px;
+    max-height: 140px;
+    overflow-y: auto;
     transition: border-color 0.15s;
   }
   .msg-input::placeholder { color: var(--text3); }
@@ -1649,7 +1766,11 @@ const STYLE = `
      sidebar gets full width (search, filter chips, channel previews are
      all readable instead of being squeezed into a 64 px icon strip). */
   @media (max-width: 640px) {
-    .card { display: block; position: relative; }
+    /* Keep the card a flex column (its default) so the
+       card → main-content → settings-panel height chain stays intact and the
+       settings panel can scroll. position:relative is kept as the positioning
+       context for the absolutely-positioned chat panel. */
+    .card { position: relative; }
     .sidebar {
       width: 100%; min-width: 0; max-width: 100%;
       border-right: none;
@@ -1876,6 +1997,11 @@ class MeshcoreChatCard extends HTMLElement {
 
     this._replyDrafts = {}; // { [chatKey]: {sender, text} } — per-chat reply drafts
 
+    // Channel scope selection
+    this._channelScopes = {};    // { 'ch:0': '#pl-mz', ... } — selected scope per channel
+    this._availableScopes = [];  // known scope names, persisted to localStorage
+    this._scopeStateLoaded = false;
+
     this._settingsTab = "general"; // "general" | "device" | "channels" | "contacts" | "about"
     this._settings = this._loadSettings(); // companion prefs (per-browser)
     this._draftSettings = null; // working copy while modal is open
@@ -2027,6 +2153,35 @@ class MeshcoreChatCard extends HTMLElement {
     const k = this._config?.device_prefix || this._devicePrefix || "default";
     return `${LS_PREFIX}${k}:console`;
   }
+
+  _scopePfx() {
+    return this._config?.device_prefix || this._devicePrefix || null;
+  }
+  _loadScopeStateIfNeeded() {
+    if (this._scopeStateLoaded) return;
+    const pfx = this._scopePfx();
+    if (!pfx) return;
+    this._scopeStateLoaded = true;
+    try {
+      const cs = localStorage.getItem(`${LS_PREFIX}${pfx}:channel_scopes`);
+      const as = localStorage.getItem(`${LS_PREFIX}${pfx}:available_scopes`);
+      if (cs) this._channelScopes = JSON.parse(cs);
+      if (as) this._availableScopes = JSON.parse(as);
+    } catch (_) {}
+  }
+  _saveScopeState() {
+    const pfx = this._scopePfx();
+    if (!pfx) return;
+    try {
+      localStorage.setItem(`${LS_PREFIX}${pfx}:channel_scopes`, JSON.stringify(this._channelScopes));
+      localStorage.setItem(`${LS_PREFIX}${pfx}:available_scopes`, JSON.stringify(this._availableScopes));
+    } catch (_) {}
+  }
+  _addAvailableScope(scope) {
+    if (!scope || this._availableScopes.includes(scope)) return;
+    this._availableScopes.push(scope);
+    this._saveScopeState();
+  }
   _loadConsoleHistory() {
     try {
       const raw = localStorage.getItem(this._consoleHistoryKey());
@@ -2087,7 +2242,25 @@ class MeshcoreChatCard extends HTMLElement {
     }
   }
 
+  connectedCallback() {
+    // Re-render the message list when the tab becomes visible again. Renders are
+    // skipped while hidden (see _renderMessages) to avoid the scroll jumping to
+    // the top, so we flush the deferred render once the layout is reliable.
+    if (!this._visibilityHandler) {
+      this._visibilityHandler = () => {
+        if (!document.hidden && this._deferredMessageRender) {
+          this._deferredMessageRender = false;
+          this._renderMessages();
+        }
+      };
+    }
+    document.addEventListener("visibilitychange", this._visibilityHandler);
+  }
+
   disconnectedCallback() {
+    if (this._visibilityHandler) {
+      document.removeEventListener("visibilitychange", this._visibilityHandler);
+    }
     if (this._connReadyHandler && this._hass) {
       this._hass.connection.removeEventListener(
         "ready",
@@ -2137,6 +2310,7 @@ class MeshcoreChatCard extends HTMLElement {
       }
     }
     if (!this._devicePrefix) return;
+    this._loadScopeStateIfNeeded();
     // If prefix was just discovered and active chat history hasn't loaded yet,
     // kick off the load now (first attempt failed with null entityId).
     if (
@@ -2657,6 +2831,14 @@ class MeshcoreChatCard extends HTMLElement {
       send_id: d.send_id || null,
     };
 
+    // Auto-discover scope names from incoming rx_log flood_scope fields.
+    if (!d.outgoing && Array.isArray(d.rx_log_data)) {
+      this._loadScopeStateIfNeeded();
+      for (const entry of d.rx_log_data) {
+        if (entry?.flood_scope) this._addAvailableScope(entry.flood_scope);
+      }
+    }
+
     this._appendMessage(key, { sender, text, ts, own: isOwn, meta });
 
     // Auto-restore the chat if it was previously closed via the × button.
@@ -2968,10 +3150,11 @@ class MeshcoreChatCard extends HTMLElement {
           return;
         }
       }
+      const scope = this._channelScopes[key] || undefined;
       serviceCall = this._hass.callService(
         "meshcore",
         "send_channel_message",
-        this._svcData({ channel_idx: chIdx, message: text }),
+        this._svcData({ channel_idx: chIdx, message: text, ...(scope ? { scope } : {}) }),
       );
     } else if (key.startsWith("dm:")) {
       const prefix = key.split(":")[1];
@@ -3006,7 +3189,7 @@ class MeshcoreChatCard extends HTMLElement {
       own: true,
       meta: echoMeta,
     });
-    if (input) input.value = "";
+    if (input) { input.value = ""; input.style.height = "auto"; }
     this._dismissAutocomplete();
     // Reply has been consumed — drop the draft and re-render the input area
     // so the reply-bar disappears.
@@ -3084,10 +3267,11 @@ class MeshcoreChatCard extends HTMLElement {
     if (key.startsWith("ch:")) {
       const chIdx = this._resolveChannelIdx(key);
       if (!Number.isInteger(chIdx)) return;
+      const scope = this._channelScopes[key] || undefined;
       serviceCall = this._hass.callService(
         "meshcore",
         "send_channel_message",
-        this._svcData({ channel_idx: chIdx, message: text }),
+        this._svcData({ channel_idx: chIdx, message: text, ...(scope ? { scope } : {}) }),
       );
     } else if (key.startsWith("dm:")) {
       const prefix = key.split(":")[1];
@@ -3383,6 +3567,8 @@ class MeshcoreChatCard extends HTMLElement {
     this._render();
     if (pane === "settings") {
       this._fetchDeviceSettings();
+    } else if (pane === "console") {
+      this._mobileShowChat();
     } else {
       this._loadHistoryForActive();
       this._mobileShowSidebar();
@@ -3787,7 +3973,10 @@ class MeshcoreChatCard extends HTMLElement {
       <div class="channel-item ${active ? "active" : ""}" data-key="${esc(key)}">
         <div class="channel-icon" style="${iconStyle(color)}">${esc(icon)}</div>
         <div class="channel-info">
-          <div class="channel-name">${esc(name)}</div>
+          <div class="channel-name">
+            ${esc(name)}
+            ${key.startsWith("ch:") && this._channelScopes[key] ? `<span class="scope-badge">${esc(this._channelScopes[key])}</span>` : ""}
+          </div>
           <div class="channel-sub">${sub}</div>
         </div>
         ${unread ? `<div class="unread-badge">${unread}</div>` : ""}
@@ -3881,11 +4070,31 @@ class MeshcoreChatCard extends HTMLElement {
          </button>`
       : "";
 
+    const isChannel = key.startsWith("ch:");
+    let scopePickerHtml = "";
+    if (isChannel) {
+      this._loadScopeStateIfNeeded();
+      const selScope = this._channelScopes[key] || "";
+      const opts = [`<option value="">global</option>`]
+        .concat(this._availableScopes.map(
+          (s) => `<option value="${esc(s)}"${s === selScope ? " selected" : ""}>${esc(s)}</option>`
+        ))
+        .join("");
+      scopePickerHtml = `
+        <div class="scope-row">
+          <select class="scope-select" data-action="scope-select">${opts}</select>
+          <button class="scope-add-btn" data-action="scope-add" title="Add scope">+</button>
+          <input class="scope-new-input" data-action="scope-new-input" placeholder="#region" hidden />
+          <button class="scope-new-confirm" data-action="scope-new-confirm" hidden title="Confirm">✓</button>
+        </div>`;
+    }
+
     el.innerHTML = `
       <button class="mobile-back" data-action="mobile-back" title="Back to chats" aria-label="Back to chats">‹</button>
       <div class="chat-header-icon" style="${iconStyle(color)}">${esc(icon)}</div>
-      <div>
+      <div class="chat-header-info">
         <div class="chat-header-name">${esc(name)}</div>
+        ${scopePickerHtml}
       </div>
       <div class="chat-header-sub">${esc(sub)}</div>
       ${hopsBtn}
@@ -3897,6 +4106,45 @@ class MeshcoreChatCard extends HTMLElement {
     const hopsBtnEl = el.querySelector('[data-action="toggle-hops"]');
     if (hopsBtnEl)
       hopsBtnEl.addEventListener("click", () => this._toggleHops());
+
+    // Scope picker wiring (channel views only)
+    const scopeSel = el.querySelector('[data-action="scope-select"]');
+    if (scopeSel) {
+      scopeSel.addEventListener("change", () => {
+        const v = scopeSel.value;
+        if (v) this._channelScopes[key] = v;
+        else delete this._channelScopes[key];
+        this._saveScopeState();
+        this._renderSidebarList();
+      });
+    }
+    const scopeAddBtn = el.querySelector('[data-action="scope-add"]');
+    const scopeInput  = el.querySelector('[data-action="scope-new-input"]');
+    const scopeConfirm = el.querySelector('[data-action="scope-new-confirm"]');
+    const _showScopeInput = (show) => {
+      if (scopeInput)  scopeInput.hidden = !show;
+      if (scopeConfirm) scopeConfirm.hidden = !show;
+      if (scopeAddBtn) scopeAddBtn.hidden = show;
+      if (show && scopeInput) scopeInput.focus();
+    };
+    const _confirmNewScope = () => {
+      let v = scopeInput?.value?.trim() ?? "";
+      if (!v) { _showScopeInput(false); return; }
+      if (!v.startsWith("#")) v = "#" + v;
+      this._addAvailableScope(v);
+      this._channelScopes[key] = v;
+      this._saveScopeState();
+      this._renderHeader();
+      this._renderSidebarList();
+    };
+    if (scopeAddBtn) scopeAddBtn.addEventListener("click", () => _showScopeInput(true));
+    if (scopeConfirm) scopeConfirm.addEventListener("click", _confirmNewScope);
+    if (scopeInput) {
+      scopeInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); _confirmNewScope(); }
+        if (e.key === "Escape") _showScopeInput(false);
+      });
+    }
   }
 
   _toggleHops() {
@@ -4090,6 +4338,15 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
   }
 
   _renderMessages() {
+    // While the browser tab is hidden the messages container has no reliable
+    // layout (clientHeight/scrollHeight read as 0), so the scroll-restore math
+    // below would mistake the view for "at bottom" and jump to the top. Defer
+    // until the tab is visible again — not touching innerHTML here preserves the
+    // current scrollTop, and the visibilitychange handler re-renders on return.
+    if (document.hidden) {
+      this._deferredMessageRender = true;
+      return;
+    }
     const el = this.shadowRoot.getElementById("messages-area");
     if (!el) return;
     if (this._pane === "console") {
@@ -4330,7 +4587,8 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
 
     let icon = "",
       text = "",
-      repeaters = null;
+      repeaters = null,
+      scope = null;
 
     if (m.outgoing) {
       if (m.message_type === "direct") {
@@ -4381,24 +4639,32 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
           text = `${list.length} hop${list.length === 1 ? "" : "s"}`;
           repeaters = list;
         }
+        scope = Array.isArray(m.rx_log_data)
+          ? (m.rx_log_data.find((e) => e?.flood_scope)?.flood_scope ?? null)
+          : null;
+        if (scope && !text) { icon = "↘"; text = "received"; }
       }
     }
 
     if (!text) return "";
 
-    const repeaterChips =
-      repeaters && repeaters.length
-        ? ` <span class="meta-rps">${repeaters
-            .slice(0, 6)
-            .map(
-              (r) =>
-                `<span class="meta-rp" title="${esc(r.full || r.byte)}">${esc(r.name)}</span>`,
-            )
-            .join(
-              "",
-            )}${repeaters.length > 6 ? `<span class="meta-rp more">+${repeaters.length - 6}</span>` : ""}</span>`
+    const MAX_VISIBLE = this._settings?.max_repeaters ?? 4;
+    const repeaterChips = (() => {
+      if (!repeaters || !repeaters.length) return "";
+      const visible = repeaters.slice(0, MAX_VISIBLE);
+      const overflow = repeaters.slice(MAX_VISIBLE);
+      const chips = visible.map(
+        (r) => `<span class="meta-rp" title="${esc(r.full || r.byte)}">${esc(r.name)}</span>`
+      ).join("");
+      const moreChip = overflow.length
+        ? `<span class="meta-rp more">+${overflow.length}<span class="meta-rp-overflow">${
+            overflow.map((r) => `<span class="meta-rp-overflow-item" title="${esc(r.full || r.byte)}">${esc(r.name)}</span>`).join("")
+          }</span></span>`
         : "";
-    return `<div class="msg-meta"><span class="meta-icon">${icon}</span> ${esc(text)}${repeaterChips}</div>`;
+      return ` <span class="meta-rps">${chips}${moreChip}</span>`;
+    })();
+    const scopeChip = scope ? ` <span class="meta-scope">${esc(scope)}</span>` : "";
+    return `<div class="msg-meta"><span class="meta-icon">${icon}</span> ${esc(text)}${repeaterChips}${scopeChip}</div>`;
   }
 
   // Walk ALL path nodes from ALL rx_log_data entries — deduplicated, ordered by first appearance.
@@ -4510,7 +4776,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     const existingRb = this.shadowRoot.getElementById("reply-bar");
     if (existingRb) existingRb.remove();
 
-    el.innerHTML = `<input class="msg-input" placeholder="${reply ? `Mention @${esc(reply.sender || "user")}…` : "Type a message…"}" maxlength="200" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-bwignore /><button class="send-btn" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>`;
+    el.innerHTML = `<textarea class="msg-input" placeholder="${reply ? `Mention @${esc(reply.sender || "user")}…` : "Type a message…"}" maxlength="200" rows="1" data-bwignore></textarea><button class="send-btn" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>`;
 
     if (reply) {
       el.insertAdjacentHTML(
@@ -4537,7 +4803,14 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       }
     }
 
-    input.addEventListener("input", () => this._updateAutocomplete(input));
+    const _autoResize = () => {
+      input.style.height = "auto";
+      input.style.height = Math.min(input.scrollHeight, 140) + "px";
+    };
+    input.addEventListener("input", () => {
+      _autoResize();
+      this._updateAutocomplete(input);
+    });
     input.addEventListener("keydown", (e) => {
       if (this._autocomplete) {
         if (e.key === "ArrowDown") {
@@ -5062,6 +5335,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       compact: !!d.compact,
       height: String(d.height || "").trim() || undefined,
       show_hops: d.show_hops !== false && d.show_hops !== "false",
+      max_repeaters: Math.max(1, Math.min(20, parseInt(d.max_repeaters, 10) || 4)),
       channels: cleanChannels,
       contacts: cleanContacts,
     };
@@ -5338,6 +5612,10 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
           </label>
           <label>Max messages / chat
             <input type="number" name="max_messages" min="20" max="2000" value="${d.max_messages || 200}" />
+          </label>
+          <label>Max repeater chips
+            <input type="number" name="max_repeaters" min="1" max="20" value="${d.max_repeaters ?? 4}" />
+            <div class="help">Repeater names shown below messages before +N overflow.</div>
           </label>
         </div>
         <label>Card height
@@ -5769,6 +6047,8 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       if (mm !== undefined) this._draftSettings.max_messages = mm;
       const hh = num("history_hours");
       if (hh !== undefined) this._draftSettings.history_hours = hh;
+      const mr = num("max_repeaters");
+      if (mr !== undefined) this._draftSettings.max_repeaters = mr;
       const cb = get("compact");
       if (cb)
         this._draftSettings.compact =
