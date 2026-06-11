@@ -31,7 +31,7 @@
  * settings) and via the Lovelace visual editor (getConfigElement).
  */
 
-const CHAT_CARD_VERSION = "1.0.0";
+const CHAT_CARD_VERSION = "1.0.2";
 console.info(
   `%c MESHCORE-CHAT-CARD %c v${CHAT_CARD_VERSION} `,
   "color:#fff;background:#1976d2;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px",
@@ -1998,8 +1998,8 @@ class MeshcoreChatCard extends HTMLElement {
     this._replyDrafts = {}; // { [chatKey]: {sender, text} } — per-chat reply drafts
 
     // Channel scope selection
-    this._channelScopes = {};    // { 'ch:0': '#pl-mz', ... } — selected scope per channel
-    this._availableScopes = [];  // known scope names, persisted to localStorage
+    this._channelScopes = {}; // { 'ch:0': '#pl-mz', ... } — selected scope per channel
+    this._availableScopes = []; // known scope names, persisted to localStorage
     this._scopeStateLoaded = false;
 
     this._settingsTab = "general"; // "general" | "device" | "channels" | "contacts" | "about"
@@ -2173,8 +2173,14 @@ class MeshcoreChatCard extends HTMLElement {
     const pfx = this._scopePfx();
     if (!pfx) return;
     try {
-      localStorage.setItem(`${LS_PREFIX}${pfx}:channel_scopes`, JSON.stringify(this._channelScopes));
-      localStorage.setItem(`${LS_PREFIX}${pfx}:available_scopes`, JSON.stringify(this._availableScopes));
+      localStorage.setItem(
+        `${LS_PREFIX}${pfx}:channel_scopes`,
+        JSON.stringify(this._channelScopes),
+      );
+      localStorage.setItem(
+        `${LS_PREFIX}${pfx}:available_scopes`,
+        JSON.stringify(this._availableScopes),
+      );
     } catch (_) {}
   }
   _addAvailableScope(scope) {
@@ -3154,7 +3160,11 @@ class MeshcoreChatCard extends HTMLElement {
       serviceCall = this._hass.callService(
         "meshcore",
         "send_channel_message",
-        this._svcData({ channel_idx: chIdx, message: text, ...(scope ? { scope } : {}) }),
+        this._svcData({
+          channel_idx: chIdx,
+          message: text,
+          ...(scope ? { scope } : {}),
+        }),
       );
     } else if (key.startsWith("dm:")) {
       const prefix = key.split(":")[1];
@@ -3189,7 +3199,10 @@ class MeshcoreChatCard extends HTMLElement {
       own: true,
       meta: echoMeta,
     });
-    if (input) { input.value = ""; input.style.height = "auto"; }
+    if (input) {
+      input.value = "";
+      input.style.height = "auto";
+    }
     this._dismissAutocomplete();
     // Reply has been consumed — drop the draft and re-render the input area
     // so the reply-bar disappears.
@@ -3271,7 +3284,11 @@ class MeshcoreChatCard extends HTMLElement {
       serviceCall = this._hass.callService(
         "meshcore",
         "send_channel_message",
-        this._svcData({ channel_idx: chIdx, message: text, ...(scope ? { scope } : {}) }),
+        this._svcData({
+          channel_idx: chIdx,
+          message: text,
+          ...(scope ? { scope } : {}),
+        }),
       );
     } else if (key.startsWith("dm:")) {
       const prefix = key.split(":")[1];
@@ -3776,7 +3793,6 @@ class MeshcoreChatCard extends HTMLElement {
         { sig: "reset_path <pubkey_prefix>", desc: "Reset path to contact" },
         { sig: "get_bat", desc: "Get battery level" },
         { sig: "get_time", desc: "Get device time" },
-        { sig: "get_devicetime", desc: "Get device timestamp" },
         { sig: "set_name <name>", desc: "Set node name" },
         {
           sig: "set_radio <freq> <bw> <sf> <cr>",
@@ -4076,9 +4092,12 @@ class MeshcoreChatCard extends HTMLElement {
       this._loadScopeStateIfNeeded();
       const selScope = this._channelScopes[key] || "";
       const opts = [`<option value="">global</option>`]
-        .concat(this._availableScopes.map(
-          (s) => `<option value="${esc(s)}"${s === selScope ? " selected" : ""}>${esc(s)}</option>`
-        ))
+        .concat(
+          this._availableScopes.map(
+            (s) =>
+              `<option value="${esc(s)}"${s === selScope ? " selected" : ""}>${esc(s)}</option>`,
+          ),
+        )
         .join("");
       scopePickerHtml = `
         <div class="scope-row">
@@ -4119,17 +4138,20 @@ class MeshcoreChatCard extends HTMLElement {
       });
     }
     const scopeAddBtn = el.querySelector('[data-action="scope-add"]');
-    const scopeInput  = el.querySelector('[data-action="scope-new-input"]');
+    const scopeInput = el.querySelector('[data-action="scope-new-input"]');
     const scopeConfirm = el.querySelector('[data-action="scope-new-confirm"]');
     const _showScopeInput = (show) => {
-      if (scopeInput)  scopeInput.hidden = !show;
+      if (scopeInput) scopeInput.hidden = !show;
       if (scopeConfirm) scopeConfirm.hidden = !show;
       if (scopeAddBtn) scopeAddBtn.hidden = show;
       if (show && scopeInput) scopeInput.focus();
     };
     const _confirmNewScope = () => {
       let v = scopeInput?.value?.trim() ?? "";
-      if (!v) { _showScopeInput(false); return; }
+      if (!v) {
+        _showScopeInput(false);
+        return;
+      }
       if (!v.startsWith("#")) v = "#" + v;
       this._addAvailableScope(v);
       this._channelScopes[key] = v;
@@ -4137,11 +4159,15 @@ class MeshcoreChatCard extends HTMLElement {
       this._renderHeader();
       this._renderSidebarList();
     };
-    if (scopeAddBtn) scopeAddBtn.addEventListener("click", () => _showScopeInput(true));
+    if (scopeAddBtn)
+      scopeAddBtn.addEventListener("click", () => _showScopeInput(true));
     if (scopeConfirm) scopeConfirm.addEventListener("click", _confirmNewScope);
     if (scopeInput) {
       scopeInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") { e.preventDefault(); _confirmNewScope(); }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          _confirmNewScope();
+        }
         if (e.key === "Escape") _showScopeInput(false);
       });
     }
@@ -4642,7 +4668,10 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         scope = Array.isArray(m.rx_log_data)
           ? (m.rx_log_data.find((e) => e?.flood_scope)?.flood_scope ?? null)
           : null;
-        if (scope && !text) { icon = "↘"; text = "received"; }
+        if (scope && !text) {
+          icon = "↘";
+          text = "received";
+        }
       }
     }
 
@@ -4653,17 +4682,25 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       if (!repeaters || !repeaters.length) return "";
       const visible = repeaters.slice(0, MAX_VISIBLE);
       const overflow = repeaters.slice(MAX_VISIBLE);
-      const chips = visible.map(
-        (r) => `<span class="meta-rp" title="${esc(r.full || r.byte)}">${esc(r.name)}</span>`
-      ).join("");
+      const chips = visible
+        .map(
+          (r) =>
+            `<span class="meta-rp" title="${esc(r.full || r.byte)}">${esc(r.name)}</span>`,
+        )
+        .join("");
       const moreChip = overflow.length
-        ? `<span class="meta-rp more">+${overflow.length}<span class="meta-rp-overflow">${
-            overflow.map((r) => `<span class="meta-rp-overflow-item" title="${esc(r.full || r.byte)}">${esc(r.name)}</span>`).join("")
-          }</span></span>`
+        ? `<span class="meta-rp more">+${overflow.length}<span class="meta-rp-overflow">${overflow
+            .map(
+              (r) =>
+                `<span class="meta-rp-overflow-item" title="${esc(r.full || r.byte)}">${esc(r.name)}</span>`,
+            )
+            .join("")}</span></span>`
         : "";
       return ` <span class="meta-rps">${chips}${moreChip}</span>`;
     })();
-    const scopeChip = scope ? ` <span class="meta-scope">${esc(scope)}</span>` : "";
+    const scopeChip = scope
+      ? ` <span class="meta-scope">${esc(scope)}</span>`
+      : "";
     return `<div class="msg-meta"><span class="meta-icon">${icon}</span> ${esc(text)}${repeaterChips}${scopeChip}</div>`;
   }
 
@@ -5067,7 +5104,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     if (antennaBtn) antennaBtn.classList.add("broadcasting");
     this._renderAdvertPopover();
 
-    const cmd = flood ? "send_advert" : "send_advert false";
+    const cmd = flood ? "send_advert true" : "send_advert false";
     try {
       await this._hass.callService(
         "meshcore",
@@ -5335,7 +5372,10 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       compact: !!d.compact,
       height: String(d.height || "").trim() || undefined,
       show_hops: d.show_hops !== false && d.show_hops !== "false",
-      max_repeaters: Math.max(1, Math.min(20, parseInt(d.max_repeaters, 10) || 4)),
+      max_repeaters: Math.max(
+        1,
+        Math.min(20, parseInt(d.max_repeaters, 10) || 4),
+      ),
       channels: cleanChannels,
       contacts: cleanContacts,
     };
@@ -6363,7 +6403,6 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       }),
     );
 
-
     // Location
     root.querySelector("#loc-apply")?.addEventListener("click", () =>
       withBtn(root.querySelector("#loc-apply"), "Applying…", async () => {
@@ -6397,7 +6436,6 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         },
       ),
     );
-
 
     // Time sync
     const timeSyncBtn = root.querySelector("#time-sync-btn");
