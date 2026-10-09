@@ -35,7 +35,7 @@
  * Requires meshcore-ha 3.0+ (Home Assistant 2025.6+).
  */
 
-const CHAT_CARD_VERSION = "2.2.0";
+const CHAT_CARD_VERSION = "2.2.1";
 console.info(
   `%c MESHCORE-CHAT-CARD %c v${CHAT_CARD_VERSION} `,
   "color:#fff;background:#1976d2;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px",
@@ -2401,6 +2401,8 @@ class MeshcoreChatCard extends HTMLElement {
     // the top, so we flush the deferred render once the layout is reliable.
     if (!this._visibilityHandler) {
       this._visibilityHandler = () => {
+        // Last chance to write before a reload or tab close.
+        if (document.hidden && this._hass) this._saveOutbox();
         if (!document.hidden && this._deferredMessageRender) {
           this._deferredMessageRender = false;
           this._renderMessages();
@@ -2454,6 +2456,11 @@ class MeshcoreChatCard extends HTMLElement {
     }
     for (const t of this._lsTimers) clearTimeout(t);
     this._lsTimers.clear();
+    if (this._outboxTimer) {
+      clearTimeout(this._outboxTimer);
+      this._outboxTimer = null;
+      this._saveOutbox();
+    }
   }
 
   // ── Discovery from hass.states ─────────────────────────────────────
@@ -2907,6 +2914,7 @@ class MeshcoreChatCard extends HTMLElement {
     const why = reasons[d.reason] || d.reason || "Send failed";
     m.meta.progressive = false;
     m.meta.send_error = d.detail ? `${why}: ${d.detail}` : why;
+    this._touchOutbox();
     if (this._pane === "chats") this._renderMessages();
   }
 
@@ -3125,6 +3133,7 @@ class MeshcoreChatCard extends HTMLElement {
       // Incoming updates are always progressive; that flag only means
       // "still collecting" on our own sends.
       if (m.own) m.meta.progressive = !!d.progressive;
+      if (m.own) this._touchOutbox();
       if (this._pane === "chats") this._renderMessages();
     };
 
@@ -3202,12 +3211,6 @@ class MeshcoreChatCard extends HTMLElement {
         const own = !!myName && sender === myName;
         this._appendMessage(key, { sender, text, ts, own });
       }
-      // Only update the UI if the user is still looking at this channel.
-      if (key === this._activeKey) {
-        this._renderMessages();
-        this._renderHeader();
-        this._renderSidebarList();
-      }
     } catch (err) {
       // Older HA versions: try the history fallback
       console.debug(
@@ -3215,6 +3218,116 @@ class MeshcoreChatCard extends HTMLElement {
         err,
       );
     }
+    // The logbook only has the text; put back what we knew about our own
+    // messages (delivery state, errors) so e.g. Resend survives a reload.
+    this._restoreOutbox(key);
+    // Only update the UI if the user is still looking at this channel.
+    if (key === this._activeKey) {
+      this._renderMessages();
+      this._renderHeader();
+      this._renderSidebarList();
+    }
+  }
+
+  // ── Outbox: delivery state of our own messages, kept across reloads ──
+  // The logbook history carries no delivery information, so without this a
+  // reload would turn "no relays heard" (with its Resend button) into a plain
+  // bubble, and drop messages that failed to send altogether.
+  _outboxKey() {
+    const k = this._config?.device_prefix || this._devicePrefix || "default";
+    return `${LS_PREFIX}${k}:outbox`;
+  }
+
+  // Debounced; called whenever an own message's meta may have changed.
+  _touchOutbox() {
+    if (this._outboxTimer) return;
+    this._outboxTimer = setTimeout(() => {
+      this._outboxTimer = null;
+      this._saveOutbox();
+    }, 400);
+  }
+
+  _saveOutbox() {
+    const cutoff = Date.now() - 48 * 3600 * 1000;
+    const rows = [];
+    for (const [key, arr] of Object.entries(this._messages)) {
+      for (const m of arr) {
+        if (!m.own || !m.meta?.outgoing || m.ts < cutoff) continue;
+        const meta = { ...m.meta };
+        // Keep only what the status line needs from each heard copy.
+        if (Array.isArray(meta.rx_log_data))
+          meta.rx_log_data = meta.rx_log_data.slice(0, 20).map((e) => ({
+            path: e.path,
+            path_len: e.path_len,
+            path_hash_size: e.path_hash_size,
+            path_nodes: e.path_nodes,
+            flood_scope: e.flood_scope,
+          }));
+        rows.push({ k: key, s: m.sender, t: m.text, ts: m.ts, m: meta });
+      }
+    }
+    rows.sort((a, b) => a.ts - b.ts);
+    try {
+      // Chats whose stored rows have not been merged back in this session are
+      // not fully in memory; keep those rows instead of overwriting them.
+      const restored = this._outboxRestored || new Set();
+      const kept = this._readOutbox().filter(
+        (r) => !restored.has(r.k) && r.ts >= cutoff,
+      );
+      localStorage.setItem(
+        this._outboxKey(),
+        JSON.stringify([...kept, ...rows].slice(-80)),
+      );
+    } catch (_) {}
+  }
+
+  _readOutbox() {
+    try {
+      const rows = JSON.parse(localStorage.getItem(this._outboxKey()) || "[]");
+      return Array.isArray(rows) ? rows.filter((r) => r && r.k && r.m) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  _restoreOutbox(key) {
+    const arr = this._messages[key] || (this._messages[key] = []);
+    const horizon =
+      Date.now() - Math.max(1, this._config.history_hours || 24) * 3600 * 1000;
+    let added = false;
+    for (const r of this._readOutbox()) {
+      if (r.k !== key || typeof r.t !== "string" || r.ts < horizon) continue;
+      const meta = { ...r.m };
+      // Whatever was still in flight when the page went away is over by now.
+      if (Date.now() - r.ts > 30000) meta.progressive = false;
+      if (meta.ls?.state === "checking") delete meta.ls;
+      // The logbook entry of a direct message is written after the ACK wait,
+      // so allow a generous gap between it and the stored send time.
+      // Our name in the logbook can differ from the one the echo used, so in
+      // a direct chat anything not from the peer counts as ours.
+      const peer = key.startsWith("dm:") ? this._channelName(key) : null;
+      const match = arr.find(
+        (m) =>
+          m.text === r.t &&
+          Math.abs(m.ts - r.ts) < 30000 &&
+          (m.own ||
+            m.sender === r.s ||
+            (peer !== null && m.sender !== peer) ||
+            Math.abs(m.ts - r.ts) < 3000),
+      );
+      if (match) {
+        // Already carries live state from this session: leave it alone.
+        if (match.meta?.outgoing) continue;
+        match.own = true;
+        match.meta = meta;
+      } else {
+        // Not in the logbook (e.g. it never left the companion).
+        arr.push({ sender: r.s, text: r.t, ts: r.ts, own: true, meta });
+        added = true;
+      }
+    }
+    if (added) arr.sort((a, b) => a.ts - b.ts);
+    (this._outboxRestored || (this._outboxRestored = new Set())).add(key);
   }
 
   // ── Reply / mention helpers ───────────────────────────────────────
@@ -3818,6 +3931,7 @@ class MeshcoreChatCard extends HTMLElement {
       st.state = "resent";
       this._resendMessage(key, m, attempt + 1);
     }
+    this._touchOutbox();
     if (key === this._activeKey && this._pane === "chats")
       this._renderMessages();
   }
@@ -5005,6 +5119,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     }
     const el = this.shadowRoot.getElementById("messages-area");
     if (!el) return;
+    this._touchOutbox();
     if (this._pane === "console") {
       this._renderConsoleLog(el);
       return;
