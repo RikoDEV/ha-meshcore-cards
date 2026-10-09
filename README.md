@@ -35,6 +35,10 @@ Console commands, channel provisioning, contact add/remove, adverts and device s
 
 ### Method 1 — HACS (recommended)
 
+[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=RikoDEV&repository=ha-meshcore-cards&category=plugin)
+
+Click the button to open this repository in HACS, then click **Download** and reload the browser. Or add it by hand:
+
 1. Open HACS in your Home Assistant sidebar.
 2. Go to **Frontend**.
 3. Click **⋮ → Custom repositories**.
