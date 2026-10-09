@@ -2,11 +2,9 @@
  * MeshCore Chat Card for Home Assistant
  * Inspired by the MeshCore companion app UI
  *
- * Installation:
- *   1. Copy this file to /config/www/meshcore-chat-card.js
- *   2. Add to Lovelace resources:
- *      url: /local/meshcore-chat-card.js
- *      type: module
+ * Shipped with the "MeshCore Companion Cards" integration
+ * (custom_components/meshcore_cards), which serves this file and loads it in
+ * the frontend — no dashboard resource needs to be added.
  *
  * Card YAML config (everything is optional — auto-discovered from binary sensors):
  *   type: custom:meshcore-chat-card
@@ -6844,22 +6842,17 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
   }
 }
 
-// The file can be loaded twice (dashboard resource + panel module_url, with
-// different cache tags), so every registration is guarded.
+// The file can be loaded twice (e.g. a leftover dashboard resource from an
+// older install next to the integration's copy), so every registration is
+// guarded.
 if (!customElements.get("meshcore-chat-card"))
   customElements.define("meshcore-chat-card", MeshcoreChatCard);
 
 /* ==================================================================== *
  *  Sidebar panel — the same UI as a full-page Home Assistant panel     *
  *                                                                      *
- *  configuration.yaml:                                                 *
- *    panel_custom:                                                     *
- *      - name: meshcore-panel                                          *
- *        url_path: meshcore                                            *
- *        sidebar_title: MeshCore                                       *
- *        sidebar_icon: mdi:radio-tower                                 *
- *        module_url: /hacsfiles/ha-meshcore-cards/meshcore-chat-card.js *
- *        config: {}        # same options as the card (entry_id, …)    *
+ *  Registered by the meshcore_cards integration, one panel per config  *
+ *  entry, with config = { entry_id: <companion's config entry> }.      *
  *                                                                      *
  *  Home Assistant hands the element `hass`, `narrow`, `route` and      *
  *  `panel`; every view is a URL under /<url_path> (see _routeToPath).  *
@@ -7376,5 +7369,5 @@ if (!window.customCards.some((c) => c.type === "meshcore-chat-card"))
     description: "Chat & node browser for MeshCore mesh radio networks",
     preview: false,
     version: CHAT_CARD_VERSION,
-    documentationURL: "https://github.com/meshcore-dev/meshcore-ha-cards",
+    documentationURL: "https://github.com/RikoDEV/ha-meshcore-cards",
   });

@@ -1,0 +1,14 @@
+{
+  "domain": "meshcore_cards",
+  "name": "MeshCore Companion Cards",
+  "after_dependencies": ["meshcore"],
+  "codeowners": ["@RikoDEV"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http", "panel_custom"],
+  "documentation": "https://github.com/RikoDEV/ha-meshcore-cards",
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/RikoDEV/ha-meshcore-cards/issues",
+  "requirements": [],
+  "version": "2.1.0"
+}

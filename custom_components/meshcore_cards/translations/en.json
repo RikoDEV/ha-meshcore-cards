@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a MeshCore panel",
+        "description": "Adds a MeshCore chat panel to the sidebar for one companion. The dashboard cards are available as soon as this integration is set up.",
+        "data": {
+          "companion_entry_id": "Companion",
+          "title": "Sidebar title",
+          "icon": "Sidebar icon",
+          "url_path": "URL path",
+          "require_admin": "Show to administrators only"
+        },
+        "data_description": {
+          "url_path": "The panel opens at /<URL path>. Lowercase letters, digits, hyphens and underscores."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Use lowercase letters, digits, hyphens and underscores only.",
+      "url_path_in_use": "Another panel or dashboard already uses this URL path."
+    },
+    "abort": {
+      "no_companions": "No MeshCore companion found. Set up the MeshCore integration first.",
+      "all_companions_configured": "Every MeshCore companion already has a panel.",
+      "already_configured": "This companion already has a panel."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "MeshCore panel",
+        "data": {
+          "title": "Sidebar title",
+          "icon": "Sidebar icon",
+          "url_path": "URL path",
+          "require_admin": "Show to administrators only"
+        },
+        "data_description": {
+          "url_path": "The panel opens at /<URL path>. Lowercase letters, digits, hyphens and underscores."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Use lowercase letters, digits, hyphens and underscores only.",
+      "url_path_in_use": "Another panel or dashboard already uses this URL path."
+    }
+  }
+}

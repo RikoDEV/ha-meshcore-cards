@@ -7,11 +7,9 @@
  * `sensor.meshcore_<pubkey10>_*` entities created by the meshcore-ha
  * integration.
  *
- * Installation:
- *   1. Copy this file to /config/www/meshcore-repeater-card.js
- *   2. Add to Lovelace resources:
- *        url: /local/meshcore-repeater-card.js
- *        type: module
+ * Shipped with the "MeshCore Companion Cards" integration
+ * (custom_components/meshcore_cards), which serves this file and loads it in
+ * the frontend — no dashboard resource needs to be added.
  *
  * Card YAML config (everything optional except a repeater selector):
  *   type: custom:meshcore-repeater-card
@@ -1938,7 +1936,10 @@ class MeshcoreRepeaterCard extends HTMLElement {
   }
 }
 
-customElements.define("meshcore-repeater-card", MeshcoreRepeaterCard);
+// Guarded: a leftover dashboard resource from an older install may load this
+// file a second time.
+if (!customElements.get("meshcore-repeater-card"))
+  customElements.define("meshcore-repeater-card", MeshcoreRepeaterCard);
 
 /* ───────────────────────── Visual editor ───────────────────────── */
 
@@ -2168,18 +2169,20 @@ class MeshcoreRepeaterCardEditor extends HTMLElement {
   }
 }
 
-customElements.define(
-  "meshcore-repeater-card-editor",
-  MeshcoreRepeaterCardEditor,
-);
+if (!customElements.get("meshcore-repeater-card-editor"))
+  customElements.define(
+    "meshcore-repeater-card-editor",
+    MeshcoreRepeaterCardEditor,
+  );
 
 // Register with HACS / Lovelace card picker.
 window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "meshcore-repeater-card",
-  name: "MeshCore Repeater",
-  description: "Live stats and history charts for a single MeshCore repeater",
-  preview: false,
-  version: REPEATER_CARD_VERSION,
-  documentationURL: "https://github.com/meshcore-dev/meshcore-ha-cards",
-});
+if (!window.customCards.some((c) => c.type === "meshcore-repeater-card"))
+  window.customCards.push({
+    type: "meshcore-repeater-card",
+    name: "MeshCore Repeater",
+    description: "Live stats and history charts for a single MeshCore repeater",
+    preview: false,
+    version: REPEATER_CARD_VERSION,
+    documentationURL: "https://github.com/RikoDEV/ha-meshcore-cards",
+  });

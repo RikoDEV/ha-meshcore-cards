@@ -1,458 +1,329 @@
 # MeshCore Companion Cards for Home Assistant
 
-Custom Lovelace cards that bring a full MeshCore mesh-radio companion experience into Home Assistant — real-time chat, channel messaging, contact management, repeater telemetry, and more.
+A MeshCore companion app inside Home Assistant: real-time chat, channels, direct messages, contacts, a node browser, a command console and repeater telemetry. It runs as a full-page sidebar panel and as dashboard cards.
 
-<img width="2560" height="1269" alt="image" src="https://github.com/user-attachments/assets/a3b80ca7-6280-48d9-aec4-e8eb907edd9b" />
+[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=RikoDEV&repository=ha-meshcore-cards&category=integration)
 
----
+<img width="2560" height="1269" alt="MeshCore chat" src="https://github.com/user-attachments/assets/a3b80ca7-6280-48d9-aec4-e8eb907edd9b" />
 
-<img width="2560" height="1269" alt="chrome_1T4sxWenCA" src="https://github.com/user-attachments/assets/96ed2ad6-b4d6-49ff-ab70-ab10b54f2996" />
+<img width="2560" height="1269" alt="MeshCore repeater card" src="https://github.com/user-attachments/assets/96ed2ad6-b4d6-49ff-ab70-ab10b54f2996" />
 
----
+## Contents
 
-## Cards included
+- [What you get](#what-you-get)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Sidebar panel](#sidebar-panel)
+- [Chat card](#chat-card)
+- [Repeater card](#repeater-card)
+- [Theming](#theming)
+- [Troubleshooting](#troubleshooting)
+- [Bot automations](#bot-automations)
+- [Related](#related)
 
-| File | Card type | Purpose |
-|------|-----------|---------|
-| `meshcore-chat-card.js` | `custom:meshcore-chat-card` | Full companion chat UI — channels, DMs, contacts, node list |
-| `meshcore-chat-card.js` | `meshcore-panel` (sidebar panel) | The same UI as a full-page Home Assistant panel with a URL per view |
-| `meshcore-repeater-card.js` | `custom:meshcore-repeater-card` | Live repeater stats with sparkline charts |
+## What you get
 
+| | How you use it | Purpose |
+|---|---|---|
+| **Sidebar panel** | **MeshCore** entry in the Home Assistant sidebar | The chat UI as a full page, with a URL for every view |
+| **Chat card** | `type: custom:meshcore-chat-card` | The same chat UI on any dashboard |
+| **Repeater card** | `type: custom:meshcore-repeater-card` | Live stats, history charts, settings and a console for one repeater |
 
----
+All three come from one small integration, `meshcore_cards`. It serves the JavaScript, loads the cards in the frontend and registers the panel, so there are no dashboard resources to add and nothing to put in `configuration.yaml`.
 
-## Prerequisites
+## Requirements
 
-1. **[meshcore-ha integration](https://github.com/meshcore-dev/meshcore-ha) 3.0 or newer** installed and configured in Home Assistant (HACS or manual).
-2. At least one MeshCore node connected (USB, BLE, or TCP).
-3. Home Assistant **2025.6** or newer (required by meshcore-ha 3.0).
-
-Console commands, channel provisioning, contact add/remove, adverts and device settings use the integration's `execute_command` service, which meshcore-ha 3.0 restricts to **administrator** accounts. Reading and sending messages works for every user.
-
----
+- [meshcore-ha](https://github.com/meshcore-dev/meshcore-ha) **3.0 or newer**, set up with at least one companion (USB, BLE or TCP).
+- Home Assistant **2025.6 or newer**.
+- An **administrator** account for anything that runs a companion command: the consoles, channel provisioning, adding or removing contacts, adverts and device settings. meshcore-ha 3.0 restricts those to admins. Reading and sending messages works for every user.
 
 ## Installation
 
-### Method 1 — HACS (recommended)
+### 1. Install
 
-[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=RikoDEV&repository=ha-meshcore-cards&category=plugin)
+**HACS (recommended).** Click the button at the top of this page, then **Download**. If HACS answers "Repository not found", add the repository once by hand:
 
-Click the button to open this repository in HACS, then click **Download** and reload the browser. If HACS answers "Repository not found", it does not know this custom repository yet — add it by hand once:
+1. Open HACS and choose **⋮ → Custom repositories**.
+2. Add `https://github.com/RikoDEV/ha-meshcore-cards` with type **Integration**.
+3. Click **Download** on **MeshCore Companion Cards**.
 
-1. Open HACS in your Home Assistant sidebar.
-2. Go to **Frontend**.
-3. Click **⋮ → Custom repositories**.
-4. Add this repository URL and set category to **Lovelace**.
-5. Click **Download** on **MeshCore Companion Cards**.
-6. Reload the browser.
+**Manual.** Copy `custom_components/meshcore_cards` from this repository into `config/custom_components/`.
 
-HACS registers `meshcore-chat-card.js` as a dashboard resource automatically. For the repeater card, also add `/hacsfiles/ha-meshcore-cards/meshcore-repeater-card.js` as a **JavaScript module** under **Settings → Dashboards → ⋮ → Resources**. Then continue with step 3 below.
+Either way, **restart Home Assistant** afterwards.
 
-### Method 2 — Manual
+### 2. Add the integration
 
-Copy `meshcore-chat-card.js` (and optionally `meshcore-repeater-card.js`) to your HA `config/www/` directory:
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=meshcore_cards)
 
-```
-/config/www/meshcore-chat-card.js
-/config/www/meshcore-repeater-card.js
-```
+Go to **Settings → Devices & Services → Add integration → MeshCore Companion Cards**, pick your companion and confirm the sidebar title, icon and URL path.
 
-Then register the resources. Go to **Settings → Dashboards → ⋮ (top-right menu) → Resources** and add:
+The **MeshCore** panel appears in the sidebar, and both cards become available on every dashboard. Reload the browser once so the frontend picks them up.
 
-| URL | Type |
-|-----|------|
-| `/local/meshcore-chat-card.js` | JavaScript module |
-| `/local/meshcore-repeater-card.js` | JavaScript module |
+### 3. Add cards to a dashboard (optional)
 
-Or add to your `configuration.yaml` / `ui-lovelace.yaml`:
-
-```yaml
-lovelace:
-  resources:
-    - url: /local/meshcore-chat-card.js
-      type: module
-    - url: /local/meshcore-repeater-card.js
-      type: module
-```
-
-Reload Lovelace (or hard-refresh the browser) after adding resources.
-
-### Step 3 — Add the card to a dashboard
-
-Use the visual editor (**+ Add Card → Custom: Meshcore Chat Card**) or paste YAML directly:
+Use **+ Add card** and search for *MeshCore*, or paste YAML:
 
 ```yaml
 type: custom:meshcore-chat-card
 ```
 
-The card auto-discovers your node from `binary_sensor.meshcore_*_messages` entities — no manual configuration required for a basic setup.
+The card finds your companion from its `binary_sensor.meshcore_*_messages` entities, so a basic setup needs no options.
 
----
+<details>
+<summary><b>Upgrading from the dashboard-plugin version (2.0 and older)</b></summary>
 
-## Sidebar panel (`meshcore-panel`)
+Earlier versions were a HACS *Dashboard* plugin. To switch:
 
-The chat UI can also run as its own entry in the Home Assistant sidebar. It fills the page, uses the Home Assistant app bar, and gives every view its own URL, so the browser back button, bookmarks and links work.
+1. In HACS, remove the old **MeshCore Companion Cards** download, then add the repository again as an **Integration**.
+2. Remove the old entries under **Settings → Dashboards → ⋮ → Resources** (`/hacsfiles/ha-meshcore-cards/…` or `/local/meshcore-…-card.js`) and delete any copies in `config/www/`.
+3. If you added a `panel_custom:` entry for `meshcore-panel` to `configuration.yaml`, remove it. The integration registers the panel now, and one URL path cannot be registered twice.
 
-Add this to `configuration.yaml` and restart Home Assistant:
+Your dashboards keep working: card types and options are unchanged.
 
-```yaml
-panel_custom:
-  - name: meshcore-panel
-    url_path: meshcore
-    sidebar_title: MeshCore
-    sidebar_icon: mdi:radio-tower
-    # HACS install. For a manual install use /local/meshcore-chat-card.js
-    module_url: /hacsfiles/ha-meshcore-cards/meshcore-chat-card.js
-    config:
-      # Optional. Accepts the same options as the card, except `height`.
-      node_name: MyNode
-```
+</details>
 
-| URL | View |
-|-----|------|
+## Sidebar panel
+
+The panel fills the page, uses the Home Assistant app bar, and gives every view its own URL. Browser back, bookmarks and links all work.
+
+| URL (default path `meshcore`) | View |
+|---|---|
 | `/meshcore/chats` | Chat list (wide screens also show the last-open chat) |
 | `/meshcore/chats/ch/<idx>` | A channel |
 | `/meshcore/chats/dm/<pubkey prefix>` | A direct conversation |
-| `/meshcore/nodes`, `/meshcore/nodes/<pubkey prefix>` | Node list, node detail |
+| `/meshcore/nodes` | Node list |
+| `/meshcore/nodes/<pubkey prefix>` | Node detail |
 | `/meshcore/console` | Command console |
 | `/meshcore/settings/<tab>` | Settings: `general`, `device`, `channels`, `contacts`, `about` |
 
-`name` must stay `meshcore-panel`; `url_path` and the sidebar title/icon are yours to choose. For several companions, add one entry per companion with a different `url_path` and its own `config.entry_id`.
+- **Change it:** **Settings → Devices & Services → MeshCore Companion Cards → Configure** edits the title, icon and URL path, and can limit the panel to administrators.
+- **Several companions:** add the integration once per companion. Each gets its own panel and URL path.
+- **Remove it:** delete the integration entry.
 
-The dashboard card keeps working as before and does not change the URL.
+## Chat card
 
----
+The card and the panel are the same UI with four tabs: **Chat**, **Nodes**, **Console** and **Settings**.
 
-## Chat Card (`meshcore-chat-card`)
+### Options
 
-### Minimal config (auto-discovery)
+Every option is optional and can also be set in the visual card editor.
+
+| Option | Default | Description |
+|---|---|---|
+| `node_name` | from the device | Your node's name, used to mark your own messages |
+| `device_prefix` | auto-detected | First 6 hex characters of the companion's public key, as used in entity IDs |
+| `entry_id` | auto-detected | Config entry of the companion. Set it only if detection picks the wrong one |
+| `channels` | discovered | List of `idx` / `name` pairs that override or pre-configure channel names |
+| `contacts` | discovered | List of `pubkey_prefix` / `name` pairs to pin in the chat list |
+| `max_messages` | `200` | Messages kept in memory per chat |
+| `history_hours` | `24` | Hours of logbook history loaded when a chat is first opened |
+| `default_pane` | `chats` | Tab shown first: `chats` or `nodes` |
+| `compact` | `false` | Tighter rows in the chat list |
+| `height` | `600px` | Card height as any CSS length: `700px`, `80vh`, `"min(80vh, 900px)"`. Ignored by the panel |
 
 ```yaml
 type: custom:meshcore-chat-card
-```
-
-### Full config reference
-
-```yaml
-type: custom:meshcore-chat-card
-
-# Your own node's display name — used to highlight your own messages.
-# Must match the name your device broadcasts.
 node_name: MyNode
-
-# 6-character public-key prefix of your connected device.
-# Auto-detected from binary sensor entity IDs; set manually if auto-detection
-# fails or you have multiple devices.
-device_prefix: b8f68f
-
-# Config entry ID. Resolved automatically from the device prefix; set it only
-# if you have several companions and auto-detection picks the wrong one.
-entry_id: abc123def456
-
-# Override or pre-configure channel names. Without this, channels are
-# discovered automatically from the integration.
+height: 75vh
+history_hours: 48
 channels:
   - idx: 0
     name: Public
   - idx: 1
     name: "#local"
-  - idx: 2
-    name: "#emergency"
-
-# Pin DM contacts by pubkey prefix. These appear in the sidebar even before
-# any message has been received, and are synced to/from the device.
 contacts:
   - pubkey_prefix: fe3af51b24b9
     name: Alice Pocket V2
-  - pubkey_prefix: a1b2c3d4e5f6
-    name: Bob HT
-
-# Number of messages kept in memory per chat (default: 200).
-max_messages: 200
-
-# Hours of logbook history to load on first open (default: 24).
-history_hours: 48
-
-# Starting pane when the card loads: "chats" or "nodes" (default: "chats").
-default_pane: chats
-
-# Compact row spacing in the sidebar (default: false).
-compact: false
-
-# Card height — any CSS length value (default: 600px).
-# Examples: 600px | 80vh | min(80vh, 900px)
-height: 700px
 ```
 
-### Visual editor
+The **Settings** tab stores the same preferences per browser (in `localStorage`), and they take priority over the YAML. Each phone or computer can therefore keep its own node name, history length, channel list and so on.
 
-All options above are also available through the Lovelace **visual card editor** — click the pencil icon on any added card.
+### Chats
 
-### Companion settings (per-browser)
-
-Click the **gear icon** (⚙) in the sidebar header to open companion settings. These are stored in browser `localStorage` and override card YAML, so each browser/device can have its own preferences:
-
-- Node name and device prefix
-- History hours and message limit
-- Default pane
-- Channel list (add, rename, remove, apply to device)
-- Contact list (add, remove, sync to device)
-
----
-
-## Features — Chat Card
-
-### Channels
-
-- Auto-discovered from `binary_sensor.meshcore_*_ch_*_messages` entities.
-- Additional channels fetched from the integration's `get_channels` service.
-- **Add a channel:** click **+** in the sidebar or open Settings → Channels.
-- **Apply to device:** the Settings modal provisions new/renamed channels on the radio via `set_channel`.
-- Channel names starting with `#` are preserved as-is; plain names work too.
-
-### Direct messages (DMs)
-
-- Auto-discovered from `binary_sensor.meshcore_*_<pubkey>_messages` entities.
-- Pin permanent contacts via `contacts:` config or Settings → Contacts.
-- Add/remove contacts on the device from within the settings modal.
+- **Channels** come from the integration's `get_channels` service and from `binary_sensor.meshcore_*_ch_*_messages` entities.
+- **Direct chats** come from `binary_sensor.meshcore_*_<pubkey>_messages` entities and from `contacts:`.
+- **Add a channel** with **+** in the chat list, or edit the list under **Settings → Channels** and choose **Apply to device**.
+- **Region scope:** each channel header has a scope picker. Pick or add a scope (for example `#region`) to send that channel's messages as a region-scoped flood.
+- **Close a chat** with **×**. It comes back when a new message arrives, or through "Show hidden chats".
+- **Send an advert** (flood or zero-hop) with the antenna button.
 
 ### Messaging
 
-- **Send:** type and press `Enter` (or the send button).
-- **Reply:** hover a message and click ↩ — the reply bar appears with an `@[Name]` prefix following MeshCore companion convention.
-- **Multiline:** `Shift+Enter` inserts a newline; messages preserve line breaks.
-- **Mention autocomplete:** type `@` to get a dropdown of contacts and nodes; navigate with `↑ ↓`, confirm with `Enter` or `Tab`.
-- **Channel autocomplete:** type `#` to get a dropdown of channels; selecting navigates to that channel.
-- **Inline highlights:** `@[Name]` mentions are shown as blue chips; `#channel` references as green chips (clicking navigates to that channel).
-- **Resend:** when a channel message is not heard by any repeater (or a DM receives no ACK), a **↺ Resend** button appears on the bubble.
+| Action | How |
+|---|---|
+| Send | `Enter` or the send button |
+| New line | `Shift+Enter` |
+| Reply | Hover a message and click ↩. The message is prefixed with `@[Name]` |
+| Mention | Type `@`, choose with `↑` `↓`, confirm with `Enter` or `Tab` |
+| Link a channel | Type `#`. Clicking a `#channel` chip in a message opens that channel |
+| Resend | **↺ Resend** appears when no repeater heard a channel message or a direct message got no ACK |
 
 ### Delivery status
 
-Each own message shows a status footer under the bubble:
+Your own messages show a status line under the bubble.
 
 | Status | Meaning |
-|--------|---------|
-| `↑ sent` | Message dispatched to the radio |
-| `📡 sending…` | Waiting for repeater confirmation |
-| `📡 heard by N repeater(s)` | Confirmed reception with repeater list |
-| `📡 broadcast (no relays heard)` | Sent but no repeater reported hearing it |
-| `📡 unconfirmed (too long to hear repeats)` | The message is too long for the companion to report relayed copies, so repeats are unknown |
-| `✓ delivered` | DM ACK received |
-| `✕ no ACK` | DM sent, no acknowledgement |
-| `✕ <reason>` | The message did not leave the companion (not connected, rejected, contact missing, or held back by the mesh traffic policy) |
+|---|---|
+| `↑ sent` | Direct message accepted by the companion, waiting for the ACK |
+| `✓ delivered` | Direct message acknowledged |
+| `✕ no ACK` | Direct message not acknowledged in time |
+| `📡 sending…` | Channel message sent, still listening for repeats (4 to 20 seconds) |
+| `📡 heard by N repeaters` | Repeaters were heard relaying it; they are listed next to the status |
+| `📡 broadcast (no relays heard)` | Sent, but no repeat was heard |
+| `📡 unconfirmed (too long to hear repeats)` | The message is too long for the companion to report relayed copies |
+| `✕ <reason>` | The message never left the companion: not connected, rejected, contact missing, or held back by the mesh traffic policy |
 
-Statuses follow the integration's `send_id`, so they stay attached to the right bubble for the whole repeat-collection window (4–20 s) or ACK wait.
+The toggle at the top right of a chat hides these lines; confirmed messages then show a small `✓` instead.
 
-The **hops toggle** button (📡 icon, top-right of chat header) collapses the status footer. When hidden, a compact `✓` in accent colour appears instead on confirmed messages.
+### Nodes, Console and Settings
 
-### Nodes tab
+- **Nodes** lists every discovered node with its type and online state. Selecting one opens its details, including a map when it reports a position.
+- **Console** runs companion commands (`get_bat`, `send_advert`, `set_channel …`) and shows the response. Click a command in the list to prefill it.
+- **Settings** has five tabs: **General** (preferences), **Device** (name, radio, location, time sync), **Channels**, **Contacts** and **About**.
 
-Switch between **Chats** and **Nodes** using the tab bar at the top of the sidebar. The Nodes tab shows all discovered mesh nodes with online/offline status and a detail view on click.
+### Narrow screens
 
-### Mobile layout
+When the card or panel is 640 px wide or less, the list and the conversation stack. Selecting a chat slides it in, and the back arrow returns to the list. In the panel that step is a real navigation, so the browser or phone back button works too.
 
-When the card (or panel) is 640 px wide or less, the sidebar and chat panel stack: the sidebar shows first; selecting a chat slides the panel in. A **‹** back button returns to the sidebar. In the sidebar panel this step is a real navigation, so the browser or phone back button works too.
+## Repeater card
 
-### Card height
+Shows one repeater in three tabs: **Information** (stat tiles, history charts, neighbours), **Settings** and **Console**.
 
-Set `height:` in YAML to any CSS length. Examples:
+### Options
 
-```yaml
-height: 700px    # fixed pixels
-height: 80vh     # fraction of viewport
-height: "min(80vh, 900px)"   # capped
-```
-
----
-
-## Repeater Card (`meshcore-repeater-card`)
-
-### Minimal config
-
-```yaml
-type: custom:meshcore-repeater-card
-```
-
-Auto-discovers the first available repeater from `sensor.meshcore_*` entities.
-
-### Full config reference
+| Option | Default | Description |
+|---|---|---|
+| `repeater` | first one found | 10-hex public-key prefix from the entity IDs, or the repeater's name |
+| `title` | repeater name | Card title |
+| `hours` | `24` | History window for the charts, 1 to 720 |
+| `stats` | see below | Stat tiles to show, in order |
+| `charts` | see below | Charts to show, in order |
+| `entry_id` | auto-detected | Config entry of the companion used to reach the repeater. Only needed if the console cannot find it |
+| `login_password` | empty | Repeater admin password, used by the Settings and Console tabs |
 
 ```yaml
 type: custom:meshcore-repeater-card
-
-# 10-hex pubkey prefix used in entity IDs, OR the repeater's friendly name.
-# Omit to use the first discovered repeater.
 repeater: b8f68f1234
-
-# Card title override (default: repeater name from HA).
-title: "Hilltop Repeater"
-
-# History window for sparkline charts in hours (default: 24).
-hours: 24
-
-# Stat tiles to show (and their order). All available keys:
-stats:
-  - battery_percentage
-  - bat
-  - uptime
-  - last_rssi
-  - last_snr
-  - tx_queue_len
-  - noise_floor
-  - nb_sent
-  - nb_recv
-  - airtime
-
-# Sparkline charts to render (and their order).
-charts:
-  - battery_percentage
-  - last_rssi
-  - last_snr
-  - airtime
-  - tx_queue_len
-  - noise_floor
+title: Hilltop Repeater
+hours: 48
+stats: [battery_percentage, bat, uptime, last_rssi, last_snr, tx_queue_len]
+charts: [battery_percentage, last_rssi, last_snr, airtime]
 ```
 
-### Available metrics
+The `stats` and `charts` shown are the defaults.
+
+### Metrics
 
 | Key | Label | Unit |
-|-----|-------|------|
+|---|---|---|
 | `battery_percentage` | Battery | % |
 | `bat` | Voltage | V |
-| `uptime` | Uptime | — |
+| `uptime` | Uptime | |
 | `airtime` | Airtime | min |
 | `last_rssi` | RSSI | dBm |
 | `last_snr` | SNR | dB |
-| `tx_queue_len` | TX queue | — |
 | `noise_floor` | Noise floor | dBm |
-| `nb_sent` | Packets sent | — |
-| `nb_recv` | Packets recv | — |
-| `sent_flood` | Flood sent | — |
-| `sent_direct` | Direct sent | — |
-| `recv_flood` | Flood recv | — |
-| `recv_direct` | Direct recv | — |
-| `full_evts` | Full events | — |
-| `direct_dups` | Direct dups | — |
+| `tx_queue_len` | TX queue | |
+| `nb_sent` / `nb_recv` | Packets sent / received | |
+| `sent_flood` / `sent_direct` | Flood / direct packets sent | |
+| `recv_flood` / `recv_direct` | Flood / direct packets received | |
+| `full_evts` | Full events | |
+| `direct_dups` | Direct duplicates | |
 
----
+A metric is only available when meshcore-ha exposes the matching `sensor.meshcore_<pubkey>_*` entity for that repeater.
 
 ## Theming
 
-Both cards read the active Home Assistant theme automatically via CSS custom properties (`--primary-color`, `--card-background-color`, `--primary-text-color`, etc.). Light, dark, and custom themes all work without any configuration.
-
-To override the chat bubble border-radius:
-
-```yaml
-# In your theme YAML or card's style: override
-# --bubble-radius controls chat bubble rounding (default: 18px)
-```
-
-Card height and border-radius follow `--ha-card-border-radius` and `--ha-card-box-shadow` from the active theme.
-
----
+Everything follows the active Home Assistant theme through its CSS variables (`--primary-color`, `--card-background-color`, `--primary-text-color` and so on). Light, dark and custom themes work without configuration. Cards use the theme's `--ha-card-border-radius` and `--ha-card-box-shadow`; the panel's app bar uses `--app-header-background-color` and `--app-header-text-color`.
 
 ## Troubleshooting
 
-### Card doesn't appear / "Custom element doesn't exist"
+<details>
+<summary><b>The panel or cards don't appear ("Custom element doesn't exist")</b></summary>
 
-- Confirm the `.js` files are in `/config/www/`.
-- Confirm the resource URLs are registered (Settings → Dashboards → Resources).
-- Hard-refresh the browser (`Ctrl+Shift+R` / `Cmd+Shift+R`).
+- Check that **MeshCore Companion Cards** is listed under **Settings → Devices & Services**. Nothing is loaded until the integration is set up.
+- Restart Home Assistant after installing or updating, then hard-refresh the browser (`Ctrl+Shift+R` / `Cmd+Shift+R`).
+- If the integration entry failed to set up, another panel or dashboard probably uses the same URL path. Remove a leftover `panel_custom:` entry or choose another path.
 
-### No channels or messages appear
+</details>
 
-- Check that the meshcore-ha integration is installed and your node is connected.
-- Look for `binary_sensor.meshcore_*_messages` entities in **Developer Tools → States**.
-- If entities exist but the card doesn't find them, set `device_prefix:` manually to the 6-char prefix shown in the entity IDs.
+<details>
+<summary><b>No channels or messages</b></summary>
 
-### Messages load slowly / missing history
+- Check that meshcore-ha is set up and the companion is connected.
+- Look for `binary_sensor.meshcore_*_messages` entities under **Developer Tools → States**.
+- If they exist but the card stays empty, set `device_prefix:` to the 6 characters shown in those entity IDs.
 
-- Increase `history_hours:` (e.g. `48`).
-- The logbook must be enabled in HA. If the logbook integration is disabled, history won't load.
-- History is loaded once per chat per page load; navigate away and back to reload.
+</details>
 
-### "Apply to device" does nothing
+<details>
+<summary><b>History is missing</b></summary>
 
-- Ensure the meshcore-ha integration is connected (check the integration status in Settings → Devices & Services).
-- The `set_channel` command requires firmware that supports API commands.
-- Check HA logs for `meshcore` errors after clicking Apply.
+- Raise `history_hours:`.
+- History comes from the Home Assistant logbook, which must be enabled.
+- It is loaded once per chat per page load. Reload the page to fetch it again.
 
-### Autocomplete doesn't show contacts
+</details>
 
-- The card builds the contact list from `_discoveredContacts` and `_discoveredNodes` populated by the integration. If no contacts appear, verify the integration has discovered your mesh nodes (check the Nodes tab).
-- Ensure at least one advert has been received from the target node.
+<details>
+<summary><b>A message stays on "sending…"</b></summary>
 
-### Messages stuck on "sending…"
+Listening for repeats takes 4 to 20 seconds depending on the packet's airtime. If no final result arrives within 25 seconds, the status changes to "broadcast (no relays heard)".
 
-- Repeat collection takes 4 to 20 seconds depending on the packet's airtime. If no final delivery update arrives within 25 seconds, status clears to "broadcast (no relays heard)".
+</details>
 
-### "This action needs a Home Assistant administrator"
+<details>
+<summary><b>"This action needs a Home Assistant administrator"</b></summary>
 
-- meshcore-ha 3.0 only lets administrators run companion commands. Log in with an admin account to use the console, provision channels, manage contacts, send adverts or change device settings.
+meshcore-ha 3.0 only lets administrators run companion commands. Log in with an admin account to use the consoles, provision channels, manage contacts, send adverts or change device settings.
 
-### A command is rejected or "try again in N seconds"
+</details>
+
+<details>
+<summary><b>A command is rejected, or "try again in N seconds"</b></summary>
 
 - meshcore-ha 3.0 refuses commands that reset the node, replace its identity or send raw frames.
-- Under the Governed mesh traffic policy, sends and mesh commands spend credit from a budget. When it is empty the integration reports how long to wait; the card shows that message under the bubble or in the console.
+- Under the Governed mesh traffic policy, sends and mesh commands spend credit from a budget. When it runs out, the integration says how long to wait, and that message is shown under the bubble or in the console.
 
-### Multiple MeshCore devices
+</details>
 
-Each card only shows events from its own companion. The companion is picked from `device_prefix:` (the config entry is resolved automatically), or set `entry_id:` explicitly. Find the entry ID in **Settings → Devices & Services → Meshcore → ⋮ → System information**.
+<details>
+<summary><b>"Apply to device" does nothing</b></summary>
 
----
+- Check that the companion is connected and that you are an administrator.
+- Look for `meshcore` errors in the Home Assistant log after clicking **Apply to device**.
 
-## Example dashboard YAML
+</details>
 
-```yaml
-views:
-  - title: MeshCore
-    cards:
-      - type: custom:meshcore-chat-card
-        node_name: MyNode
-        height: 75vh
-        history_hours: 48
-        channels:
-          - idx: 0
-            name: Public
-          - idx: 1
-            name: "#local"
+<details>
+<summary><b>Mention autocomplete shows no contacts</b></summary>
 
-      - type: custom:meshcore-repeater-card
-        repeater: b8f68f1234
-        hours: 24
-        charts:
-          - battery_percentage
-          - last_rssi
-          - last_snr
-```
+Suggestions come from the nodes the integration has discovered. Check the **Nodes** tab; a node appears there after its first advert is received.
 
----
+</details>
 
-## Automations
+<details>
+<summary><b>Several companions</b></summary>
 
-The `automations/` directory contains optional bot automations that respond to channel commands.
+Each panel and card only shows its own companion's messages. The panel is bound to the companion you picked when adding the integration. A card picks its companion from `device_prefix:`, or from `entry_id:` if you set it; the entry ID is the last part of the URL when you open the companion under **Settings → Devices & Services → MeshCore**.
 
-### Path automation (`meshcore-path-automation.yaml`)
+</details>
 
-Responds to `es path` on channel 2 with a formatted hop list showing each repeater in the message path.
+## Bot automations
 
-**Features:**
-- Emoji markers: 📡 first hop, ↳ middle hops, 🏁 last hop
-- Resolves repeater names from HA contact entities
-- Configurable own-repeater name override
-- Splits long paths across two messages (127-char limit per message)
-- Per-user rate limit: 2 requests per minute
+The `automations/` folder has optional example automations that answer commands sent on a channel. They are plain Home Assistant automations: paste one into **Settings → Automations → ⋮ → Edit in YAML** and adjust it. All of them listen on **channel 2**; change `channel_idx` to suit your mesh.
 
-#### Required helper
+| File | Command | Reply | Also needs |
+|---|---|---|---|
+| `meshcore-path-automation.yaml` | `es path` | The repeaters the message travelled through, one per line | `input_text.meshcore_path_ratelimit` helper |
+| `meshcore-traceroute-automation.yaml` | `es trace` | Hop count, path and signal (RSSI, SNR) | |
+| `meshcore-testreg-automation.yml` | `es testreg` | The region scope the message arrived with | |
+| `meshcore-weather-automation.yaml` | `es weather <city>` | Current weather for that city | `rest_command.geocode_city` and `rest_command.get_weather_dynamic` |
 
-Before importing the automation, create a Text helper in HA to store rate-limit state:
+<details>
+<summary><b>Path automation setup</b></summary>
 
-1. Go to **Settings → Devices & Services → Helpers → + Create Helper → Text**
-2. Set **Name** to `meshcore_path_ratelimit`
-3. Leave max length at 255 (or increase to 1024 in `configuration.yaml` if you have many active users)
-4. Save — the entity ID will be `input_text.meshcore_path_ratelimit`
-
-Alternatively, add it to `configuration.yaml`:
+It limits each sender to 2 requests per minute and keeps that state in a text helper. Create it under **Settings → Devices & Services → Helpers → Create helper → Text** with the name `meshcore_path_ratelimit`, or in `configuration.yaml`:
 
 ```yaml
 input_text:
@@ -461,21 +332,19 @@ input_text:
     max: 1024
 ```
 
-#### Configuration
-
-Edit the two lines at the top of the `reply_text` template inside the automation:
+To show a friendly name for your own repeater, edit the two lines at the top of the `reply_text` template:
 
 ```yaml
-{% set my_rpt_prefix = 'B37E15' %}   # first 6 hex chars of your repeater's pubkey
-{% set my_rpt_name   = 'My Repeater' %}  # friendly name to show instead of the pubkey
+{% set my_rpt_prefix = 'B37E15' %}       # first 6 hex chars of your repeater's public key
+{% set my_rpt_name   = 'My Repeater' %}  # name to show instead
 ```
 
-Set `my_rpt_prefix` to `''` to disable the override.
+Set `my_rpt_prefix` to `''` to turn the override off.
 
----
+</details>
 
 ## Related
 
-- [meshcore-ha integration](https://github.com/meshcore-dev/meshcore-ha) — the HA integration these cards depend on
-- [meshcore-ha documentation](https://meshcore-dev.github.io/meshcore-ha/) — full sensor, service, and automation reference
-- [MeshCore firmware](https://github.com/meshcore-dev/MeshCore) — the radio firmware
+- [meshcore-ha](https://github.com/meshcore-dev/meshcore-ha): the integration these cards build on
+- [meshcore-ha documentation](https://meshcore-dev.github.io/meshcore-ha/): sensors, services, events and the traffic policy
+- [MeshCore](https://github.com/meshcore-dev/MeshCore): the radio firmware

@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Dodaj panel MeshCore",
+        "description": "Dodaje do paska bocznego panel czatu MeshCore dla jednego urządzenia companion. Karty dashboardu są dostępne od razu po skonfigurowaniu tej integracji.",
+        "data": {
+          "companion_entry_id": "Companion",
+          "title": "Tytuł w pasku bocznym",
+          "icon": "Ikona w pasku bocznym",
+          "url_path": "Ścieżka URL",
+          "require_admin": "Pokazuj tylko administratorom"
+        },
+        "data_description": {
+          "url_path": "Panel otwiera się pod adresem /<ścieżka URL>. Małe litery, cyfry, myślniki i podkreślenia."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Użyj tylko małych liter, cyfr, myślników i podkreśleń.",
+      "url_path_in_use": "Inny panel lub dashboard używa już tej ścieżki URL."
+    },
+    "abort": {
+      "no_companions": "Nie znaleziono urządzenia companion MeshCore. Najpierw skonfiguruj integrację MeshCore.",
+      "all_companions_configured": "Każde urządzenie companion MeshCore ma już panel.",
+      "already_configured": "To urządzenie companion ma już panel."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Panel MeshCore",
+        "data": {
+          "title": "Tytuł w pasku bocznym",
+          "icon": "Ikona w pasku bocznym",
+          "url_path": "Ścieżka URL",
+          "require_admin": "Pokazuj tylko administratorom"
+        },
+        "data_description": {
+          "url_path": "Panel otwiera się pod adresem /<ścieżka URL>. Małe litery, cyfry, myślniki i podkreślenia."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Użyj tylko małych liter, cyfr, myślników i podkreśleń.",
+      "url_path_in_use": "Inny panel lub dashboard używa już tej ścieżki URL."
+    }
+  }
+}
