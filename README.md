@@ -15,6 +15,7 @@ Custom Lovelace cards that bring a full MeshCore mesh-radio companion experience
 | File | Card type | Purpose |
 |------|-----------|---------|
 | `meshcore-chat-card.js` | `custom:meshcore-chat-card` | Full companion chat UI — channels, DMs, contacts, node list |
+| `meshcore-chat-card.js` | `meshcore-panel` (sidebar panel) | The same UI as a full-page Home Assistant panel with a URL per view |
 | `meshcore-repeater-card.js` | `custom:meshcore-repeater-card` | Live repeater stats with sparkline charts |
 
 
@@ -22,9 +23,11 @@ Custom Lovelace cards that bring a full MeshCore mesh-radio companion experience
 
 ## Prerequisites
 
-1. **[meshcore-ha integration](https://github.com/meshcore-dev/meshcore-ha)** installed and configured in Home Assistant (HACS or manual).
+1. **[meshcore-ha integration](https://github.com/meshcore-dev/meshcore-ha) 3.0 or newer** installed and configured in Home Assistant (HACS or manual).
 2. At least one MeshCore node connected (USB, BLE, or TCP).
-3. Home Assistant **2023.8** or newer.
+3. Home Assistant **2025.6** or newer (required by meshcore-ha 3.0).
+
+Console commands, channel provisioning, contact add/remove, adverts and device settings use the integration's `execute_command` service, which meshcore-ha 3.0 restricts to **administrator** accounts. Reading and sending messages works for every user.
 
 ---
 
@@ -82,6 +85,40 @@ The card auto-discovers your node from `binary_sensor.meshcore_*_messages` entit
 
 ---
 
+## Sidebar panel (`meshcore-panel`)
+
+The chat UI can also run as its own entry in the Home Assistant sidebar. It fills the page, uses the Home Assistant app bar, and gives every view its own URL, so the browser back button, bookmarks and links work.
+
+Add this to `configuration.yaml` and restart Home Assistant:
+
+```yaml
+panel_custom:
+  - name: meshcore-panel
+    url_path: meshcore
+    sidebar_title: MeshCore
+    sidebar_icon: mdi:radio-tower
+    # HACS install. For a manual install use /local/meshcore-chat-card.js
+    module_url: /hacsfiles/ha-meshcore-cards/meshcore-chat-card.js
+    config:
+      # Optional. Accepts the same options as the card, except `height`.
+      node_name: MyNode
+```
+
+| URL | View |
+|-----|------|
+| `/meshcore/chats` | Chat list (wide screens also show the last-open chat) |
+| `/meshcore/chats/ch/<idx>` | A channel |
+| `/meshcore/chats/dm/<pubkey prefix>` | A direct conversation |
+| `/meshcore/nodes`, `/meshcore/nodes/<pubkey prefix>` | Node list, node detail |
+| `/meshcore/console` | Command console |
+| `/meshcore/settings/<tab>` | Settings: `general`, `device`, `channels`, `contacts`, `about` |
+
+`name` must stay `meshcore-panel`; `url_path` and the sidebar title/icon are yours to choose. For several companions, add one entry per companion with a different `url_path` and its own `config.entry_id`.
+
+The dashboard card keeps working as before and does not change the URL.
+
+---
+
 ## Chat Card (`meshcore-chat-card`)
 
 ### Minimal config (auto-discovery)
@@ -104,7 +141,8 @@ node_name: MyNode
 # fails or you have multiple devices.
 device_prefix: b8f68f
 
-# Config entry ID — only needed when you have more than one MeshCore device.
+# Config entry ID. Resolved automatically from the device prefix; set it only
+# if you have several companions and auto-detection picks the wrong one.
 entry_id: abc123def456
 
 # Override or pre-configure channel names. Without this, channels are
@@ -194,8 +232,12 @@ Each own message shows a status footer under the bubble:
 | `📡 sending…` | Waiting for repeater confirmation |
 | `📡 heard by N repeater(s)` | Confirmed reception with repeater list |
 | `📡 broadcast (no relays heard)` | Sent but no repeater reported hearing it |
+| `📡 unconfirmed (too long to hear repeats)` | The message is too long for the companion to report relayed copies, so repeats are unknown |
 | `✓ delivered` | DM ACK received |
 | `✕ no ACK` | DM sent, no acknowledgement |
+| `✕ <reason>` | The message did not leave the companion (not connected, rejected, contact missing, or held back by the mesh traffic policy) |
+
+Statuses follow the integration's `send_id`, so they stay attached to the right bubble for the whole repeat-collection window (4–20 s) or ACK wait.
 
 The **hops toggle** button (📡 icon, top-right of chat header) collapses the status footer. When hidden, a compact `✓` in accent colour appears instead on confirmed messages.
 
@@ -205,7 +247,7 @@ Switch between **Chats** and **Nodes** using the tab bar at the top of the sideb
 
 ### Mobile layout
 
-At ≤ 640 px viewport width the sidebar and chat panel stack: the sidebar shows first; selecting a chat slides the panel in. A **‹** back button returns to the sidebar.
+When the card (or panel) is 640 px wide or less, the sidebar and chat panel stack: the sidebar shows first; selecting a chat slides the panel in. A **‹** back button returns to the sidebar. In the sidebar panel this step is a real navigation, so the browser or phone back button works too.
 
 ### Card height
 
@@ -338,11 +380,20 @@ Card height and border-radius follow `--ha-card-border-radius` and `--ha-card-bo
 
 ### Messages stuck on "sending…"
 
-- The card waits up to 10 seconds for a delivery update from the integration. If none arrives, status clears to "broadcast (no relays heard)".
+- Repeat collection takes 4 to 20 seconds depending on the packet's airtime. If no final delivery update arrives within 25 seconds, status clears to "broadcast (no relays heard)".
+
+### "This action needs a Home Assistant administrator"
+
+- meshcore-ha 3.0 only lets administrators run companion commands. Log in with an admin account to use the console, provision channels, manage contacts, send adverts or change device settings.
+
+### A command is rejected or "try again in N seconds"
+
+- meshcore-ha 3.0 refuses commands that reset the node, replace its identity or send raw frames.
+- Under the Governed mesh traffic policy, sends and mesh commands spend credit from a budget. When it is empty the integration reports how long to wait; the card shows that message under the bubble or in the console.
 
 ### Multiple MeshCore devices
 
-Set `entry_id:` in each card's YAML to the config entry ID of the device it should use. Find the entry ID in **Settings → Devices & Services → Meshcore → ⋮ → System information**.
+Each card only shows events from its own companion. The companion is picked from `device_prefix:` (the config entry is resolved automatically), or set `entry_id:` explicitly. Find the entry ID in **Settings → Devices & Services → Meshcore → ⋮ → System information**.
 
 ---
 

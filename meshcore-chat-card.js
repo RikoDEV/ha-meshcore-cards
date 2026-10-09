@@ -29,9 +29,15 @@
  *
  * The same options are editable via the gear icon in the sidebar (companion
  * settings) and via the Lovelace visual editor (getConfigElement).
+ *
+ * This file also defines <meshcore-panel>: the same UI as a full-page sidebar
+ * panel with a URL per view (/meshcore/chats/ch/0, /meshcore/nodes, …). See
+ * the MeshcorePanel class below for the panel_custom snippet.
+ *
+ * Requires meshcore-ha 3.0+ (Home Assistant 2025.6+).
  */
 
-const CHAT_CARD_VERSION = "1.0.2";
+const CHAT_CARD_VERSION = "2.0.0";
 console.info(
   `%c MESHCORE-CHAT-CARD %c v${CHAT_CARD_VERSION} `,
   "color:#fff;background:#1976d2;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px",
@@ -1765,40 +1771,123 @@ const STYLE = `
   /* Master / detail layout on phones — show ONE panel at a time so the
      sidebar gets full width (search, filter chips, channel previews are
      all readable instead of being squeezed into a 64 px icon strip). */
-  @media (max-width: 640px) {
-    /* Keep the card a flex column (its default) so the
-       card → main-content → settings-panel height chain stays intact and the
-       settings panel can scroll. position:relative is kept as the positioning
-       context for the absolutely-positioned chat panel. */
-    .card { position: relative; }
-    .sidebar {
-      width: 100%; min-width: 0; max-width: 100%;
-      border-right: none;
-      border-bottom: 1px solid var(--border);
-      height: 100%;
-    }
-    .chat-panel {
-      position: absolute; inset: 0;
-      background: var(--bg);
-      transform: translateX(100%);
-      transition: transform 0.18s ease-out;
-      z-index: 5;
-      will-change: transform;
-    }
-    /* When the user picks a chat / node, the host gets the mobile-show-chat
-       class and the chat panel slides in over the sidebar. */
-    :host(.mobile-show-chat) .chat-panel { transform: translateX(0); }
-    :host(.mobile-show-chat) .sidebar { visibility: hidden; }
-
-    .mobile-back { display: inline-block; }
-    .chat-header { padding-left: 12px; }
-
-.add-form-row { flex-wrap: wrap; }
-    .filter-tabs { padding: 6px 10px; }
-    .pane-tab { font-size: 11px; padding: 8px 0; }
-    /* Sidebar rows already render full info now — nothing to hide. */
+  /* Driven by the element's own width (see the ResizeObserver in
+     connectedCallback), so it also applies to a narrow dashboard column. */
+  /* Keep the card a flex column (its default) so the
+     card → main-content → settings-panel height chain stays intact and the
+     settings panel can scroll. position:relative is kept as the positioning
+     context for the absolutely-positioned chat panel. */
+  :host(.narrow) .card { position: relative; }
+  :host(.narrow) .sidebar {
+    width: 100%; min-width: 0; max-width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    height: 100%;
   }
+  :host(.narrow) .chat-panel {
+    position: absolute; inset: 0;
+    background: var(--bg);
+    transform: translateX(100%);
+    transition: transform 0.18s ease-out;
+    z-index: 5;
+    will-change: transform;
+  }
+  /* When the route has a chat / node, the host gets the mobile-show-chat
+     class and the chat panel slides in over the sidebar. */
+  :host(.narrow.mobile-show-chat) .chat-panel { transform: translateX(0); }
+  :host(.narrow.mobile-show-chat) .sidebar { visibility: hidden; }
 
+  :host(.narrow) .mobile-back { display: inline-block; }
+  :host(.narrow) .chat-header { padding-left: 12px; }
+
+  :host(.narrow) .add-form-row { flex-wrap: wrap; }
+  :host(.narrow) .filter-tabs { padding: 6px 10px; }
+  :host(.narrow) .pane-tab { font-size: 11px; padding: 8px 0; }
+
+
+  /* ── Sidebar panel (meshcore-panel) ───────────────────────────── */
+  :host(.panel) { height: 100vh; height: 100dvh; }
+  :host(.panel) .card {
+    height: 100%;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .app-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    padding: var(--safe-area-inset-top, 0px) var(--safe-area-inset-right, 0px) 0
+      var(--safe-area-inset-left, 0px);
+    background: var(--app-header-background-color, var(--primary-color));
+    color: var(--app-header-text-color, var(--text-primary-color, #fff));
+    border-bottom: var(--app-header-border-bottom, none);
+  }
+  .app-nav {
+    display: flex;
+    align-items: center;
+    height: var(--header-height, 56px);
+    padding-left: 4px;
+  }
+  .app-icon-btn {
+    width: 48px;
+    height: 48px;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .app-icon-btn:hover { background: rgba(127, 127, 127, 0.18); }
+  .app-icon-btn[hidden] { display: none; }
+  .app-back { display: none; }
+  .app-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 12px;
+    font-size: 20px;
+    line-height: var(--header-height, 56px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .app-tabs { display: flex; align-self: stretch; }
+  .app-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 48px;
+    padding: 0 16px;
+    color: inherit;
+    opacity: 0.7;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    --mdc-icon-size: 20px;
+  }
+  .app-tab:hover { opacity: 1; }
+  .app-tab.active { opacity: 1; border-bottom-color: currentColor; }
+  .app-tab .top-tab-badge {
+    background: var(--app-header-text-color, var(--text-primary-color, #fff));
+    color: var(--app-header-background-color, var(--primary-color));
+  }
+  :host(.panel.narrow) .app-tabs { flex: 1 0 100%; }
+  :host(.panel.narrow) .app-tab { flex: 1; justify-content: center; padding: 0 4px; }
+  /* The detail pane slides over the list only, so the app bar stays visible
+     (in the card it covers the whole card, tab bar included). */
+  :host(.panel.narrow) .card { position: static; }
+  :host(.panel.narrow) .main-content { position: relative; }
+  /* Narrow list → detail step: the app bar turns into a sub-page header. */
+  :host(.panel.narrow.subpage) .app-back { display: inline-flex; }
+  :host(.panel.narrow.subpage) .app-menu,
+  :host(.panel.narrow.subpage) .app-tabs,
+  :host(.panel.narrow.subpage) .mobile-back { display: none; }
 
   /* ── Console pane ─────────────────────────────────────────────── */
   .console-log {
@@ -1977,7 +2066,14 @@ class MeshcoreChatCard extends HTMLElement {
     this._messages = {}; // { key: [ {sender, text, ts, own} ] }
     this._unread = {}; // { key: count }
     this._activeKey = null; // active chat OR active node
-    this._pane = "chats"; // "chats" | "nodes"
+    this._pane = "chats"; // "chats" | "nodes" | "console" | "settings"
+    // Routing. In a dashboard card the route lives in memory (+ localStorage);
+    // the sidebar panel subclass sets _routeBase and mirrors it in the URL.
+    this._routeBase = null; // e.g. "/meshcore" when running as a panel
+    this._currentPath = null; // canonical path of the applied route
+    this._detail = false; // narrow layout: detail pane (chat/node) is showing
+    this._cameFromList = false; // detail was opened from the list (back = history.back)
+    this._lastChatKey = null;
     this._filter = "all"; // chats sub-filter
     this._nodeFilter = "all"; // nodes sub-filter: "all" | "clients" | "repeaters"
     this._search = "";
@@ -2046,6 +2142,15 @@ class MeshcoreChatCard extends HTMLElement {
     this._consoleSending = false;
 
     // Region join state (inside Settings > Channels).
+
+    // Outgoing sends keyed by the integration's send_id, so later
+    // meshcore_message / meshcore_delivery_update events upgrade the right
+    // bubble. Values are the message objects held in this._messages.
+    this._sendIndex = new Map();
+    // Config entry of the companion this card talks to (resolved from the
+    // device prefix when not set in config). Used to drop other companions'
+    // events and to target service calls.
+    this._resolvedEntryId = null;
   }
 
   setConfig(config) {
@@ -2141,9 +2246,18 @@ class MeshcoreChatCard extends HTMLElement {
       if (!raw) return;
       const s = JSON.parse(raw);
       if (!s || typeof s !== "object") return;
-      if (s.pane === "chats" || s.pane === "nodes" || s.pane === "console")
-        this._pane = s.pane;
-      if (s.activeKey) this._activeKey = s.activeKey;
+      if (
+        s.activeKey &&
+        (s.activeKey.startsWith("ch:") || s.activeKey.startsWith("dm:"))
+      )
+        this._lastChatKey = s.activeKey;
+      // As a panel the URL decides pane and active chat; only filters and the
+      // last-open chat are remembered.
+      if (this._routeBase == null) {
+        if (s.pane === "chats" || s.pane === "nodes" || s.pane === "console")
+          this._pane = s.pane;
+        if (s.activeKey) this._activeKey = s.activeKey;
+      }
       if (s.filter) this._filter = s.filter;
       if (s.nodeFilter) this._nodeFilter = s.nodeFilter;
     } catch (_) {}
@@ -2237,7 +2351,10 @@ class MeshcoreChatCard extends HTMLElement {
       this._consoleSeq = this._consoleLogs.length;
       this._restoreViewState();
       this._subscribe();
-      this._render();
+      // A card reopens on its list with the last chat remembered (the restored
+      // _activeKey is picked up as the fallback); a panel opens what the URL says.
+      this._applyRoute(this._pendingRoute || { pane: this._pane }, true);
+      this._pendingRoute = null;
       this._tickInterval = setInterval(() => this._renderMessages(), 30000);
       this._loadHistoryForActive();
       // Pull the canonical channel list from the integration. This includes
@@ -2261,9 +2378,19 @@ class MeshcoreChatCard extends HTMLElement {
       };
     }
     document.addEventListener("visibilitychange", this._visibilityHandler);
+    // Master/detail layout follows the element's own width, not the viewport:
+    // a card in a narrow column or a panel beside the HA sidebar both count.
+    if (!this._resizeObserver && typeof ResizeObserver !== "undefined") {
+      this._resizeObserver = new ResizeObserver((entries) => {
+        const w = entries[0]?.contentRect?.width || 0;
+        if (w) this.classList.toggle("narrow", w <= 640);
+      });
+    }
+    this._resizeObserver?.observe(this);
   }
 
   disconnectedCallback() {
+    this._resizeObserver?.disconnect();
     if (this._visibilityHandler) {
       document.removeEventListener("visibilitychange", this._visibilityHandler);
     }
@@ -2316,6 +2443,7 @@ class MeshcoreChatCard extends HTMLElement {
       }
     }
     if (!this._devicePrefix) return;
+    this._resolveEntryId();
     this._loadScopeStateIfNeeded();
     // If prefix was just discovered and active chat history hasn't loaded yet,
     // kick off the load now (first attempt failed with null entityId).
@@ -2363,43 +2491,6 @@ class MeshcoreChatCard extends HTMLElement {
           fn.replace(/\s*Messages\s*$/i, "").trim() || pk.slice(0, 8);
         dmContacts.push({ pubkey_prefix: pk, name, entity_id: id });
       }
-    }
-
-    // Seed any channel slots the integration's `select.meshcore_channel`
-    // helper knows about (it lists every configured channel name from
-    // coordinator._channel_info, even ones that haven't seen traffic yet
-    // and therefore have no binary_sensor). Format: "Name (idx)".
-    for (const id of Object.keys(states)) {
-      if (!id.startsWith("select.")) continue;
-      const st = states[id];
-      const opts = st?.attributes?.options || [];
-      if (!opts.length) continue;
-      // Only treat as the channel-select if EVERY option matches "<name> (idx)".
-      const parsed = [];
-      let allMatch = true;
-      for (const opt of opts) {
-        const m = String(opt).match(/^(.*?)\s*\((\d+)\)$/);
-        if (!m) {
-          allMatch = false;
-          break;
-        }
-        parsed.push({ name: m[1].trim(), idx: parseInt(m[2], 10) });
-      }
-      if (!allMatch) continue;
-      // Heuristic: it's the channel select if the entity name contains "channel".
-      if (!id.toLowerCase().includes("channel")) continue;
-      for (const { name, idx } of parsed) {
-        if (!name || name === "(unused)") continue;
-        const existing = channels.find((x) => x.idx === idx);
-        if (existing) {
-          if (!existing.name || existing.name === `Channel ${idx}`)
-            existing.name = name;
-        } else {
-          channels.push({ idx, name });
-          seenChannels.add(idx);
-        }
-      }
-      break;
     }
 
     // Merge any channels we already pulled via meshcore.get_channels.
@@ -2543,10 +2634,10 @@ class MeshcoreChatCard extends HTMLElement {
     this._discoverFromHass();
     // If we just hid the active chat, jump to the next visible one.
     if (this._activeKey === key) {
-      const remaining = this._chatKeys();
-      this._activeKey = remaining[0] || null;
+      this._activeKey = null;
+      if (this._lastChatKey === key) this._lastChatKey = null;
+      this._navigate({ pane: "chats" }, { replace: true });
       this._render();
-      if (this._activeKey) this._loadHistoryForActive();
     } else {
       this._renderSidebar();
     }
@@ -2580,25 +2671,12 @@ class MeshcoreChatCard extends HTMLElement {
     if (!this._hass) return;
     let list = null;
     try {
-      const resp = await this._hass.connection.sendMessagePromise({
-        type: "call_service",
-        domain: "meshcore",
-        service: "get_channels",
-        service_data: this._svcData(),
-        return_response: true,
-      });
-      list =
-        resp?.response?.channels || resp?.result?.response?.channels || null;
+      const resp = await this._callWithResponse("get_channels");
+      if (resp?.error)
+        console.debug("meshcore-chat-card: get_channels:", resp.error);
+      else list = resp?.channels || null;
     } catch (err) {
-      try {
-        await this._hass.callService(
-          "meshcore",
-          "get_channels",
-          this._svcData(),
-        );
-      } catch (e2) {
-        console.debug("meshcore-chat-card: get_channels unavailable:", err, e2);
-      }
+      console.debug("meshcore-chat-card: get_channels unavailable:", err);
     }
     if (Array.isArray(list)) {
       this._serviceChannels = list
@@ -2610,7 +2688,7 @@ class MeshcoreChatCard extends HTMLElement {
         )
         .map((c) => ({ idx: c.channel_idx, name: c.channel_name }));
     }
-    // Re-merge into _discoveredChannels (also re-reads select helper).
+    // Re-merge into _discoveredChannels.
     this._discoverFromHass();
     if (this.shadowRoot?.firstChild) this._renderSidebar();
   }
@@ -2623,25 +2701,12 @@ class MeshcoreChatCard extends HTMLElement {
     if (!this._hass) return;
     let list = null;
     try {
-      const resp = await this._hass.connection.sendMessagePromise({
-        type: "call_service",
-        domain: "meshcore",
-        service: "get_contacts",
-        service_data: this._svcData(),
-        return_response: true,
-      });
-      list =
-        resp?.response?.contacts || resp?.result?.response?.contacts || null;
+      const resp = await this._callWithResponse("get_contacts");
+      if (resp?.error)
+        console.debug("meshcore-chat-card: get_contacts:", resp.error);
+      else list = resp?.contacts || null;
     } catch (err) {
-      try {
-        await this._hass.callService(
-          "meshcore",
-          "get_contacts",
-          this._svcData(),
-        );
-      } catch (e2) {
-        console.debug("meshcore-chat-card: get_contacts unavailable:", err, e2);
-      }
+      console.debug("meshcore-chat-card: get_contacts unavailable:", err);
     }
     if (Array.isArray(list)) {
       this._serviceContacts = list.map((c) => ({
@@ -2663,11 +2728,7 @@ class MeshcoreChatCard extends HTMLElement {
     // shlex double-quoting so names with spaces / shell metacharacters round-trip cleanly.
     const safe = `"${String(pubkeyOrName).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
     try {
-      await this._hass.callService(
-        "meshcore",
-        "execute_command",
-        this._svcData({ command: `${action}_contact ${safe}` }),
-      );
+      await this._exec(`${action}_contact ${safe}`);
       await new Promise((r) => setTimeout(r, 250));
       await this._refreshContactsFromService();
       return { ok: true };
@@ -2748,6 +2809,16 @@ class MeshcoreChatCard extends HTMLElement {
       )
       .then((unsub) => this._unsubscribers.push(unsub))
       .catch(() => {});
+    // meshcore-ha 3.0: accept / failure notifications for our own sends.
+    for (const [type, fn] of [
+      ["meshcore_message_sent", (e) => this._handleMessageSent(e)],
+      ["meshcore_message_send_failed", (e) => this._handleSendFailed(e)],
+    ]) {
+      this._hass.connection
+        .subscribeEvents(fn, type)
+        .then((unsub) => this._unsubscribers.push(unsub))
+        .catch(() => {});
+    }
   }
 
   _resubscribe() {
@@ -2758,8 +2829,74 @@ class MeshcoreChatCard extends HTMLElement {
     this._subscribe();
   }
 
+  // The companion accepted a message. Tag the optimistic echo with the
+  // integration's send_id so every later event for this send finds it, however
+  // long the ACK wait or repeat collection takes.
+  _handleMessageSent(event) {
+    const d = event?.data || {};
+    if (!this._ownsEvent(d) || !d.send_id) return;
+    let m = this._sendIndex.get(d.send_id);
+    if (!m) {
+      const type = d.message_type === "channel" ? "ch:" : "dm:";
+      m = this._findPendingEcho(type, d.message);
+      if (!m) return;
+      m.meta.send_id = d.send_id;
+      this._sendIndex.set(d.send_id, m);
+      // Bound the index; sends finish within a minute.
+      if (this._sendIndex.size > 100)
+        this._sendIndex.delete(this._sendIndex.keys().next().value);
+    }
+    // Direct messages fire twice: on accept (progressive) and after the ACK wait.
+    if (d.message_type === "direct" && !d.progressive) {
+      if (typeof d.ack_received === "boolean")
+        m.meta.ack_received = d.ack_received;
+      if (this._pane === "chats") this._renderMessages();
+    }
+  }
+
+  // A message never left the companion. The event has no send_id or text, so
+  // it is pinned on the newest unconfirmed echo of the same kind.
+  _handleSendFailed(event) {
+    const d = event?.data || {};
+    if (!this._ownsEvent(d)) return;
+    const type = d.message_type === "channel" ? "ch:" : "dm:";
+    const m = this._findPendingEcho(type, null);
+    if (!m) return;
+    const reasons = {
+      contact_not_found: "Contact is not on the device",
+      not_connected: "Companion is not connected",
+      rejected: "Rejected by the device",
+      send_failed: "Send failed",
+      traffic_policy: "Held back by the mesh traffic policy",
+    };
+    const why = reasons[d.reason] || d.reason || "Send failed";
+    m.meta.progressive = false;
+    m.meta.send_error = d.detail ? `${why}: ${d.detail}` : why;
+    if (this._pane === "chats") this._renderMessages();
+  }
+
+  // Newest own echo that no send_id has claimed yet, in chats whose key starts
+  // with `type` ("ch:" / "dm:"). `text` narrows the match when known.
+  _findPendingEcho(type, text) {
+    const cutoff = Date.now() - 60000;
+    let best = null;
+    for (const [key, arr] of Object.entries(this._messages)) {
+      if (!key.startsWith(type)) continue;
+      for (let i = arr.length - 1; i >= Math.max(0, arr.length - 8); i--) {
+        const m = arr[i];
+        if (!m.own || !m.meta?.outgoing || m.meta.send_id || m.meta.send_error)
+          continue;
+        if (m.ts < cutoff) break;
+        if (text != null && m.text !== text) continue;
+        if (!best || m.ts > best.ts) best = m;
+      }
+    }
+    return best;
+  }
+
   _handleEvent(event) {
     const d = event?.data || {};
+    if (!this._ownsEvent(d)) return;
     const myName = this._myName;
     let key,
       sender,
@@ -2836,6 +2973,30 @@ class MeshcoreChatCard extends HTMLElement {
         typeof d.repeater_count === "number" ? d.repeater_count : null,
       send_id: d.send_id || null,
     };
+    if (d.outgoing && d.message_type === "channel") {
+      // 3.0 announces the message on accept and reports repeats afterwards
+      // through delivery updates; `collecting` says whether any will follow.
+      if (typeof d.collecting === "boolean") meta.progressive = d.collecting;
+      if (d.repeats_observable === false) meta.repeats_observable = false;
+    }
+
+    // Our own send, already on screen as an optimistic echo: upgrade it in
+    // place rather than relying on the text/time de-dup in _appendMessage.
+    const echo = d.outgoing && d.send_id && this._sendIndex.get(d.send_id);
+    if (echo) {
+      // The accept-time snapshot has no repeats or ACK yet; don't let it
+      // overwrite anything a faster delivery update already filled in.
+      if (meta.ack_received === null) delete meta.ack_received;
+      if (meta.progressive && echo.meta.progressive === false)
+        delete meta.progressive;
+      if (!meta.rx_log_data?.length) delete meta.rx_log_data;
+      if (!meta.repeater_count && echo.meta.repeater_count)
+        delete meta.repeater_count;
+      Object.assign(echo.meta, meta);
+      if (key === this._activeKey && this._pane === "chats")
+        this._renderMessages();
+      return;
+    }
 
     // Auto-discover scope names from incoming rx_log flood_scope fields.
     if (!d.outgoing && Array.isArray(d.rx_log_data)) {
@@ -2914,6 +3075,24 @@ class MeshcoreChatCard extends HTMLElement {
   // event plus an updated rx_log_data / repeater_count snapshot.
   _handleDeliveryUpdate(event) {
     const d = event?.data || {};
+    if (!this._ownsEvent(d)) return;
+    const apply = (m) => {
+      m.meta = m.meta || {};
+      if (Array.isArray(d.rx_log_data)) m.meta.rx_log_data = d.rx_log_data;
+      if (typeof d.repeater_count === "number")
+        m.meta.repeater_count = d.repeater_count;
+      if (typeof d.ack_received === "boolean")
+        m.meta.ack_received = d.ack_received;
+      if (d.repeats_observable === false) m.meta.repeats_observable = false;
+      // Incoming updates are always progressive; that flag only means
+      // "still collecting" on our own sends.
+      if (m.own) m.meta.progressive = !!d.progressive;
+      if (this._pane === "chats") this._renderMessages();
+    };
+
+    const bySendId = d.send_id && this._sendIndex.get(d.send_id);
+    if (bySendId) return apply(bySendId);
+
     if (!d.entity_id) return;
     const key = this._keyForEntityId(d.entity_id);
     if (!key) return;
@@ -2921,24 +3100,18 @@ class MeshcoreChatCard extends HTMLElement {
     if (!arr || !arr.length) return;
     const evTs = d.timestamp ? Date.parse(d.timestamp) : Date.now();
     const text = d.message || "";
-    const sender = d.sender_name || this._myName || "";
-    // Walk the most-recent few entries and upgrade the matching own message.
+    const own = !!d.outgoing;
+    // Walk the most-recent few entries and upgrade the matching message.
     // For own messages we don't require sender match: the integration's sender_name
     // may differ from the locally configured node_name (e.g. raw device name vs
     // display alias), causing false misses that leave status stuck on "sending…".
     for (let i = arr.length - 1; i >= Math.max(0, arr.length - 12); i--) {
       const m = arr[i];
-      if (!m.own) continue;
+      if (!!m.own !== own) continue;
       if (text && m.text !== text) continue;
-      if (Math.abs(m.ts - evTs) > 20000) continue;
-      m.meta = m.meta || {};
-      if (Array.isArray(d.rx_log_data)) m.meta.rx_log_data = d.rx_log_data;
-      if (typeof d.repeater_count === "number")
-        m.meta.repeater_count = d.repeater_count;
-      m.meta.progressive = !!d.progressive;
-      if (key === this._activeKey && this._pane === "chats")
-        this._renderMessages();
-      return;
+      if (!own && d.sender_name && m.sender !== d.sender_name) continue;
+      if (Math.abs(m.ts - evTs) > 25000) continue;
+      return apply(m);
     }
   }
 
@@ -3080,9 +3253,81 @@ class MeshcoreChatCard extends HTMLElement {
 
   // Build service call data, automatically injecting entry_id when configured.
   _svcData(base = {}) {
-    return this._config.entry_id
-      ? { ...base, entry_id: this._config.entry_id }
-      : base;
+    const entryId = this._entryId;
+    return entryId ? { ...base, entry_id: entryId } : base;
+  }
+
+  get _entryId() {
+    return this._config.entry_id || this._resolvedEntryId || null;
+  }
+
+  // execute_command and the contact services are admin-only in meshcore-ha 3.0.
+  get _isAdmin() {
+    return this._hass?.user?.is_admin !== false;
+  }
+
+  // Find the config entry that owns this companion's entities, so a card with
+  // only a device prefix still works when several companions are set up.
+  _resolveEntryId() {
+    if (this._config.entry_id || this._resolvedEntryId) return;
+    const dev = this._devicePrefix;
+    const ents = this._hass?.entities;
+    const devices = this._hass?.devices;
+    if (!dev || !ents || !devices) return;
+    const pfx = `binary_sensor.meshcore_${dev}_`;
+    for (const id of Object.keys(ents)) {
+      if (!id.startsWith(pfx) || !id.endsWith("_messages")) continue;
+      const entryId = devices[ents[id].device_id]?.config_entries?.[0];
+      if (entryId) {
+        this._resolvedEntryId = entryId;
+        return;
+      }
+    }
+  }
+
+  // True when a meshcore_* event belongs to this card's companion. 3.0 puts
+  // entry_id on every event; older releases only allow the entity_id check.
+  _ownsEvent(d) {
+    const mine = this._entryId;
+    if (mine && d.entry_id) return d.entry_id === mine;
+    if (d.entity_id && this._devicePrefix)
+      return d.entity_id.startsWith(
+        `binary_sensor.meshcore_${this._devicePrefix}_`,
+      );
+    return true;
+  }
+
+  // Call a response-returning meshcore service and hand back its payload.
+  async _callWithResponse(service, data = {}) {
+    const r = await this._hass.callService(
+      "meshcore",
+      service,
+      this._svcData(data),
+      undefined,
+      false,
+      true,
+    );
+    return r?.response ?? null;
+  }
+
+  // Run one companion command. Rejects for non-admins up front, and turns the
+  // integration's error-shaped responses ({error: "rejected", …}) into throws
+  // so callers don't report a refused command as success.
+  async _exec(command) {
+    if (!this._hass) throw new Error("Not connected to Home Assistant");
+    if (!this._isAdmin)
+      throw new Error("This action needs a Home Assistant administrator");
+    const resp = await this._callWithResponse("execute_command", { command });
+    if (resp && typeof resp === "object" && resp.error) {
+      const why =
+        resp.code_string || resp.reason || resp.message || resp.error_code;
+      const e = new Error(
+        why != null ? `${resp.error} (${why})` : String(resp.error),
+      );
+      e.response = resp;
+      throw e;
+    }
+    return resp;
   }
 
   get _myName() {
@@ -3218,23 +3463,28 @@ class MeshcoreChatCard extends HTMLElement {
     serviceCall
       .catch((err) => {
         console.error("meshcore-chat-card: send failed", err);
-        // Mark the optimistic echo as failed instead of adding a second system msg.
+        // Mark the optimistic echo as failed; the error shows under the bubble.
+        // A traffic-policy refusal also fires meshcore_message_send_failed, but
+        // the service error carries the wait time, so it wins here.
         const arr = this._messages[key] || [];
+        let marked = false;
         for (let i = arr.length - 1; i >= Math.max(0, arr.length - 4); i--) {
           const m = arr[i];
           if (m.own && m.text === echoText && Math.abs(m.ts - echoTs) < 8000) {
             m.meta = m.meta || {};
             m.meta.progressive = false;
             m.meta.send_error = err?.message || String(err);
+            marked = true;
             break;
           }
         }
-        this._appendMessage(key, {
-          sender: "system",
-          text: `⚠ Send failed: ${err?.message || err}`,
-          ts: Date.now(),
-          own: false,
-        });
+        if (!marked)
+          this._appendMessage(key, {
+            sender: "system",
+            text: `⚠ Send failed: ${err?.message || err}`,
+            ts: Date.now(),
+            own: false,
+          });
         this._renderMessages();
       })
       .finally(() => {
@@ -3242,9 +3492,8 @@ class MeshcoreChatCard extends HTMLElement {
         if (btn) btn.disabled = false;
         const input2 = this.shadowRoot.querySelector(".msg-input");
         if (input2) input2.focus();
-        // If no delivery update arrives within 10s, clear "sending…" so the
-        // status doesn't stay stuck. Progressive delivery updates will still
-        // upgrade the meta if they arrive later.
+        // If no final delivery update arrives, clear "sending…" so the status
+        // doesn't stay stuck. Repeat collection runs for up to 20s.
         if (key.startsWith("ch:")) {
           setTimeout(() => {
             const arr2 = this._messages[key] || [];
@@ -3266,7 +3515,7 @@ class MeshcoreChatCard extends HTMLElement {
                 break;
               }
             }
-          }, 10000);
+          }, 25000);
         }
       });
   }
@@ -3340,7 +3589,7 @@ class MeshcoreChatCard extends HTMLElement {
                 break;
               }
             }
-          }, 10000);
+          }, 25000);
         }
       });
   }
@@ -3435,18 +3684,8 @@ class MeshcoreChatCard extends HTMLElement {
     if (btnEl) btnEl.disabled = true;
 
     try {
-      // returnResponse:true (6th arg) forces HA to propagate HomeAssistantError
-      // as a WS-level rejection instead of silently logging it.
-      const result = await this._hass.callService(
-        "meshcore",
-        "execute_command",
-        this._svcData({ command: cmd }),
-        undefined,
-        false,
-        true,
-      );
+      const raw = await this._exec(cmd);
       entry.status = "ok";
-      const raw = result?.response;
       if (raw != null) {
         entry.output =
           typeof raw === "string"
@@ -3462,7 +3701,11 @@ class MeshcoreChatCard extends HTMLElement {
       const msg = err?.message || String(err);
       entry.error = msg.includes("NoneType")
         ? "Unknown or unsupported command"
-        : msg;
+        : /unauthorized/i.test(msg)
+          ? "This action needs a Home Assistant administrator"
+          : msg;
+      if (err?.response)
+        entry.output = JSON.stringify(err.response, null, 2);
     } finally {
       this._consoleSending = false;
       this._saveConsoleHistory();
@@ -3481,11 +3724,7 @@ class MeshcoreChatCard extends HTMLElement {
     if (!Number.isInteger(idx) || idx < 0 || idx > 255) return;
     try {
       const hash = await sha256Hex32(trimmed);
-      await this._hass.callService(
-        "meshcore",
-        "execute_command",
-        this._svcData({ command: `set_channel ${idx} ${trimmed} ${hash}` }),
-      );
+      await this._exec(`set_channel ${idx} ${trimmed} ${hash}`);
       // Optimistic local insertion so it appears immediately
       const existing = this._discoveredChannels.find((c) => c.idx === idx);
       if (existing) existing.name = trimmed;
@@ -3495,12 +3734,8 @@ class MeshcoreChatCard extends HTMLElement {
       if (!this._messages[key]) this._messages[key] = [];
       if (!(key in this._unread)) this._unread[key] = 0;
       this._showAddChannel = false;
-      this._activeKey = key;
-      this._pendingScrollToBottom = true;
+      this._navigate({ pane: "chats", key });
       this._renderSidebar();
-      this._renderHeader();
-      this._renderInput();
-      this._loadHistoryForActive();
       // Re-pull canonical channel list so subsequent sends see the new idx.
       this._refreshChannelsFromService();
     } catch (err) {
@@ -3509,87 +3744,223 @@ class MeshcoreChatCard extends HTMLElement {
     }
   }
 
-  _selectKey(key) {
+  // ── Routing ───────────────────────────────────────────────────────
+  // A route is { pane, key?, tab? }:
+  //   /chats            chat list (wide layouts also show the last-open chat)
+  //   /chats/ch/<idx>   a channel          /chats/dm/<pubkey>   a direct chat
+  //   /nodes            node list          /nodes/<pubkey>      node detail
+  //   /console          command console
+  //   /settings/<tab>   general | device | channels | contacts | about
+  _routeToPath(route) {
+    const { pane, key, tab } = route;
+    if (pane === "settings") return `/settings/${tab || "general"}`;
+    if (pane === "console") return "/console";
+    if (pane === "nodes")
+      return key ? `/nodes/${encodeURIComponent(key.slice(5))}` : "/nodes";
+    if (key) {
+      const [kind, id] = [key.slice(0, 2), key.slice(3)];
+      return `/chats/${kind}/${encodeURIComponent(id)}`;
+    }
+    return "/chats";
+  }
+
+  _parsePath(path) {
+    const seg = String(path || "")
+      .split("/")
+      .filter(Boolean)
+      .map((x) => {
+        try {
+          return decodeURIComponent(x);
+        } catch (_) {
+          return x;
+        }
+      });
+    const pane = seg[0];
+    if (pane === "settings") return { pane, tab: seg[1] || "general" };
+    if (pane === "console") return { pane };
+    if (pane === "nodes")
+      return { pane, key: seg[1] ? `node:${seg[1]}` : null };
+    if (pane === "chats") {
+      const ok = (seg[1] === "ch" || seg[1] === "dm") && seg[2];
+      return { pane, key: ok ? `${seg[1]}:${seg[2]}` : null };
+    }
+    return null;
+  }
+
+  // The only way to move between views. Updates the URL when running as a
+  // panel, then applies the route.
+  _navigate(route, { replace = false } = {}) {
+    if (
+      !replace &&
+      route.key &&
+      !this._detail &&
+      route.pane === this._pane
+    )
+      this._cameFromList = true;
+    if (this._routeBase != null) {
+      const url = this._routeBase + this._routeToPath(route);
+      if (url !== window.location.pathname) {
+        if (replace) window.history.replaceState(null, "", url);
+        else window.history.pushState(null, "", url);
+        // Home Assistant's router listens for this to refresh `route`.
+        window.dispatchEvent(
+          new CustomEvent("location-changed", { detail: { replace } }),
+        );
+      }
+    }
+    this._applyRoute(route);
+  }
+
+  // Single place that turns a route into view state and renders the delta.
+  _applyRoute(route, force = false) {
+    const PANES = ["chats", "nodes", "console", "settings"];
+    const TABS = ["general", "device", "channels", "contacts", "about"];
+    const pane = PANES.includes(route?.pane)
+      ? route.pane
+      : this._config.default_pane || "chats";
+    const prevPane = this._pane;
+    const prevKey = this._activeKey;
+    const prevTab = this._settingsTab;
+    const paneChanged = pane !== prevPane;
+
+    let key = null;
+    if (pane === "chats") {
+      const keys = this._chatKeys();
+      const keep = (k) => (k && keys.includes(k) ? k : null);
+      key =
+        route.key ||
+        (!paneChanged && keep(prevKey)) ||
+        keep(this._lastChatKey) ||
+        keys[0] ||
+        null;
+    } else if (pane === "nodes") {
+      key =
+        route.key ||
+        (!paneChanged && prevKey?.startsWith("node:") ? prevKey : null) ||
+        (this._discoveredNodes[0]
+          ? `node:${this._discoveredNodes[0].pubkey_prefix}`
+          : null);
+    }
+
+    this._pane = pane;
     this._activeKey = key;
-    this._pendingScrollToBottom = true; // always land at the bottom when opening a chat
-    if (this._pane === "chats") this._unread[key] = 0;
+    if (pane === "settings")
+      this._settingsTab = TABS.includes(route.tab) ? route.tab : "general";
+    this._detail = pane === "console" || !!route.key;
+    if (!this._detail) this._cameFromList = false;
+    if (pane === "chats" && key) {
+      this._lastChatKey = key;
+      this._unread[key] = 0;
+    }
+    this._currentPath = this._routeToPath({
+      pane,
+      key: route?.key ? key : null,
+      tab: this._settingsTab,
+    });
+    // Narrow layout: slide the detail pane over the list. `subpage` marks a
+    // real list → detail step (the panel swaps its menu button for "back").
+    this.classList.toggle("mobile-show-chat", this._detail);
+    this.classList.toggle(
+      "subpage",
+      this._detail && (pane === "chats" || pane === "nodes"),
+    );
     this._saveViewState();
-    this._renderSidebarList();
-    this._renderHeader();
-    this._renderMessages();
-    this._renderInput();
-    this._loadHistoryForActive();
-    // Slide the chat panel in on mobile (CSS @media only triggers <=640px).
-    this._mobileShowChat();
+
+    if (!this._hass || (!this.shadowRoot.firstChild && !force)) return;
+
+    if (paneChanged || force) {
+      if (prevPane === "settings" && pane !== "settings") this._leaveSettings();
+      if (pane === "settings" && (paneChanged || !this._draftSettings))
+        this._enterSettings();
+      this._pendingScrollToBottom = true;
+      this._render();
+      if (pane === "settings") this._fetchDeviceSettings();
+      else this._loadHistoryForActive();
+    } else if (pane === "settings") {
+      if (this._settingsTab !== prevTab) {
+        if (this._settingsTab === "contacts") this._refreshContactsFromService();
+        if (this._settingsTab === "device") this._fetchDeviceSettings();
+        this._renderSettingsPanel();
+      }
+    } else if (key !== prevKey) {
+      this._pendingScrollToBottom = true; // always land at the bottom when opening a chat
+      this._renderSidebarList();
+      this._renderHeader();
+      this._renderMessages();
+      this._renderInput();
+      this._loadHistoryForActive();
+    }
+  }
+
+  // Narrow-layout "back": detail → list.
+  _goBack() {
+    if (this._pane === "console") {
+      // The console has no list route; just reveal its command list.
+      this.classList.remove("mobile-show-chat");
+      return;
+    }
+    if (this._routeBase != null && this._cameFromList) {
+      this._cameFromList = false;
+      window.history.back();
+      return;
+    }
+    this._navigate({ pane: this._pane }, { replace: this._routeBase != null });
+  }
+
+  _selectKey(key) {
+    const pane = key.startsWith("node:") ? "nodes" : "chats";
+    // Moving between chats replaces the history entry; opening one from the
+    // list pushes, so "back" returns to the list.
+    this._navigate(
+      { pane, key },
+      { replace: this._detail && pane === this._pane },
+    );
   }
 
   _setPane(pane) {
     if (this._pane === pane) return;
-    const leavingSettings = this._pane === "settings";
-    this._pane = pane;
+    this._navigate({ pane });
+  }
 
-    if (pane === "settings") {
-      this._applyStatus = null;
-      this._refreshContactsFromService();
-      this._draftSettings = {
-        node_name: this._settings.node_name ?? this._config.node_name ?? "",
-        device_prefix:
-          this._settings.device_prefix ??
-          this._config.device_prefix ??
-          this._devicePrefix ??
-          "",
-        entry_id: this._settings.entry_id ?? this._config.entry_id ?? "",
-        max_messages:
-          this._settings.max_messages ?? this._config.max_messages ?? 200,
-        history_hours:
-          this._settings.history_hours ?? this._config.history_hours ?? 24,
-        default_pane:
-          this._settings.default_pane ?? this._config.default_pane ?? "chats",
-        compact: this._settings.compact ?? this._config.compact ?? false,
-        height: this._settings.height ?? this._config.height ?? "",
-        show_hops: this._showHops,
-      };
-      this._draftChannels = this._settings.channels?.length
-        ? this._settings.channels.map((c) => ({ ...c }))
-        : this._discoveredChannels.map((c) => ({ idx: c.idx, name: c.name }));
-      this._draftContacts = this._settings.contacts?.length
-        ? this._settings.contacts.map((c) => ({ ...c }))
-        : this._discoveredContacts.map((c) => ({
-            pubkey_prefix: c.pubkey_prefix,
-            name: c.name,
-          }));
-      this._knownChannelIdxsAtOpen = new Set(
-        this._discoveredChannels.map((c) => c.idx),
-      );
-    } else {
-      if (leavingSettings) {
-        this._draftSettings = null;
-        this._draftChannels = null;
-        this._draftContacts = null;
-      }
-      // Pick a sensible active item for the new pane.
-      if (pane === "chats") {
-        const keys = this._chatKeys();
-        this._activeKey = keys[0] || null;
-      } else if (pane === "nodes") {
-        this._activeKey = this._discoveredNodes[0]
-          ? `node:${this._discoveredNodes[0].pubkey_prefix}`
-          : null;
-      } else {
-        this._activeKey = null;
-      }
-    }
+  _enterSettings() {
+    this._applyStatus = null;
+    this._refreshContactsFromService();
+    this._draftSettings = {
+      node_name: this._settings.node_name ?? this._config.node_name ?? "",
+      device_prefix:
+        this._settings.device_prefix ??
+        this._config.device_prefix ??
+        this._devicePrefix ??
+        "",
+      entry_id: this._settings.entry_id ?? this._config.entry_id ?? "",
+      max_messages:
+        this._settings.max_messages ?? this._config.max_messages ?? 200,
+      history_hours:
+        this._settings.history_hours ?? this._config.history_hours ?? 24,
+      default_pane:
+        this._settings.default_pane ?? this._config.default_pane ?? "chats",
+      compact: this._settings.compact ?? this._config.compact ?? false,
+      height: this._settings.height ?? this._config.height ?? "",
+      show_hops: this._showHops,
+    };
+    this._draftChannels = this._settings.channels?.length
+      ? this._settings.channels.map((c) => ({ ...c }))
+      : this._discoveredChannels.map((c) => ({ idx: c.idx, name: c.name }));
+    this._draftContacts = this._settings.contacts?.length
+      ? this._settings.contacts.map((c) => ({ ...c }))
+      : this._discoveredContacts.map((c) => ({
+          pubkey_prefix: c.pubkey_prefix,
+          name: c.name,
+        }));
+    this._knownChannelIdxsAtOpen = new Set(
+      this._discoveredChannels.map((c) => c.idx),
+    );
+  }
 
-    this._saveViewState();
-    this._render();
-    if (pane === "settings") {
-      this._fetchDeviceSettings();
-    } else if (pane === "console") {
-      this._mobileShowChat();
-    } else {
-      this._loadHistoryForActive();
-      this._mobileShowSidebar();
-    }
+  _leaveSettings() {
+    this._draftSettings = null;
+    this._draftChannels = null;
+    this._draftContacts = null;
   }
 
   // ── Display helpers ───────────────────────────────────────────────
@@ -3685,16 +4056,7 @@ class MeshcoreChatCard extends HTMLElement {
     const onSettings = p === "settings";
     const onConsole = p === "console";
     shadow.innerHTML = `<style>${STYLE}</style><div class="card" data-pane="${p}">
-      <div class="top-tab-bar">
-        <button class="top-tab${p === "chats" ? " active" : ""}" data-pane="chats">
-          Chat${unread ? `<span class="top-tab-badge">${unread}</span>` : ""}
-        </button>
-        <button class="top-tab${p === "nodes" ? " active" : ""}" data-pane="nodes">
-          Nodes${this._discoveredNodes.length ? `<span class="top-tab-badge">${this._discoveredNodes.length}</span>` : ""}
-        </button>
-        <button class="top-tab${onConsole ? " active" : ""}" data-pane="console">Console</button>
-        <button class="top-tab${onSettings ? " active" : ""}" data-pane="settings">Settings</button>
-      </div>
+      ${this._renderTopBar(unread)}
       <div class="main-content">
         <div class="sidebar" id="sidebar" style="${onSettings ? "display:none" : ""}"></div>
         <div class="chat-panel" style="${onSettings ? "display:none" : ""}">
@@ -3715,10 +4077,7 @@ class MeshcoreChatCard extends HTMLElement {
       ${onConsole ? `<div class="input-area" id="input-area"></div>` : ""}
     </div>`;
 
-    shadow.querySelector(".top-tab-bar").addEventListener("click", (e) => {
-      const btn = e.target.closest(".top-tab");
-      if (btn) this._setPane(btn.dataset.pane);
-    });
+    this._wireTopBar();
 
     this._renderSidebar();
     if (!onSettings) {
@@ -3729,6 +4088,30 @@ class MeshcoreChatCard extends HTMLElement {
     } else {
       this._renderSettingsPanel();
     }
+  }
+
+  // Pane switcher. The sidebar panel overrides both methods with an app bar.
+  _renderTopBar(unread) {
+    const p = this._pane;
+    const tab = (pane, label, badge) =>
+      `<button class="top-tab${p === pane ? " active" : ""}" data-pane="${pane}">
+          ${label}${badge ? `<span class="top-tab-badge">${badge}</span>` : ""}
+        </button>`;
+    return `<div class="top-tab-bar">
+        ${tab("chats", "Chat", unread)}
+        ${tab("nodes", "Nodes", this._discoveredNodes.length)}
+        ${tab("console", "Console")}
+        ${tab("settings", "Settings")}
+      </div>`;
+  }
+
+  _wireTopBar() {
+    this.shadowRoot
+      .querySelector(".top-tab-bar")
+      .addEventListener("click", (e) => {
+        const btn = e.target.closest(".top-tab");
+        if (btn) this._setPane(btn.dataset.pane);
+      });
   }
 
   _wireScrollToBottom() {
@@ -3808,7 +4191,7 @@ class MeshcoreChatCard extends HTMLElement {
         { sig: "send_msg <key> <text>", desc: "Send direct message" },
       ];
       filterTabs = `<div class="cmd-list">
-        <div class="cmd-list-title">Available Commands</div>
+        <div class="cmd-list-title">Available Commands${this._isAdmin ? "" : " (administrators only)"}</div>
         ${CMDS.map(
           (c, i) => `<div class="cmd-item" data-cmd-idx="${i}">
           <div class="cmd-sig">${esc(c.sig)}</div>
@@ -3914,6 +4297,7 @@ class MeshcoreChatCard extends HTMLElement {
           input.value = base;
           input.focus();
         }
+        this.classList.add("mobile-show-chat");
       });
     });
 
@@ -4038,7 +4422,7 @@ class MeshcoreChatCard extends HTMLElement {
         <div class="status-dot" title="Connected"></div>`;
       el.querySelector('[data-action="mobile-back"]')?.addEventListener(
         "click",
-        () => this._mobileShowSidebar(),
+        () => this._goBack(),
       );
       el.querySelector('[data-action="clear-console"]')?.addEventListener(
         "click",
@@ -4121,7 +4505,7 @@ class MeshcoreChatCard extends HTMLElement {
 
     const backBtn = el.querySelector('[data-action="mobile-back"]');
     if (backBtn)
-      backBtn.addEventListener("click", () => this._mobileShowSidebar());
+      backBtn.addEventListener("click", () => this._goBack());
     const hopsBtnEl = el.querySelector('[data-action="toggle-hops"]');
     if (hopsBtnEl)
       hopsBtnEl.addEventListener("click", () => this._toggleHops());
@@ -4185,13 +4569,6 @@ class MeshcoreChatCard extends HTMLElement {
   _applyHopsVisibility() {
     if (this._showHops) this.classList.remove("hide-hops");
     else this.classList.add("hide-hops");
-  }
-
-  _mobileShowChat() {
-    this.classList.add("mobile-show-chat");
-  }
-  _mobileShowSidebar() {
-    this.classList.remove("mobile-show-chat");
   }
 
   _renderNodeMap(node) {
@@ -4596,9 +4973,16 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     return "";
   }
 
+  // Long channel messages don't fit the companion's serial frame, so their
+  // relayed copies can't be heard: zero repeats then means "unknown".
+  _repeatsUnknown(m) {
+    return m.message_type === "channel" && m.repeats_observable === false;
+  }
+
   _needsResend(msg) {
     const m = msg.meta;
     if (!m || !m.outgoing || m.send_error || m.progressive) return false;
+    if (this._repeatsUnknown(m)) return false;
     return this._ackLevel(msg) !== "confirmed";
   }
 
@@ -4638,6 +5022,9 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         } else if (m.progressive) {
           icon = "📡";
           text = "sending…";
+        } else if (this._repeatsUnknown(m)) {
+          icon = "📡";
+          text = "unconfirmed (too long to hear repeats)";
         } else {
           icon = "📡";
           text = "broadcast (no relays heard)";
@@ -5106,11 +5493,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
 
     const cmd = flood ? "send_advert true" : "send_advert false";
     try {
-      await this._hass.callService(
-        "meshcore",
-        "execute_command",
-        this._svcData({ command: cmd }),
-      );
+      await this._exec(cmd);
       this._lastAdvertSent = Date.now();
       this._toast(
         flood ? "📡 Flood advert sent" : "📍 Zero-hop advert sent",
@@ -5215,7 +5598,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       const entries = Array.isArray(entriesR.value)
         ? entriesR.value
         : (entriesR.value?.result ?? []);
-      const entryId = this._config.entry_id || this._settings.entry_id;
+      const entryId = this._entryId;
       const entry = entryId
         ? entries.find((e) => e.entry_id === entryId)
         : (entries.find((e) => e.domain === "meshcore") ?? entries[0]);
@@ -5256,7 +5639,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
             ? entriesR.value
             : (entriesR.value?.result ?? [])
           : [];
-      const entryId = this._config.entry_id || this._settings.entry_id;
+      const entryId = this._entryId;
       const meshcoreEntryIds = new Set(
         cfgEntries
           .filter((e) => e.domain === "meshcore")
@@ -5285,7 +5668,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       const entries = Array.isArray(entriesR.value)
         ? entriesR.value
         : (entriesR.value?.result ?? []);
-      const entryId = this._config.entry_id || this._settings.entry_id;
+      const entryId = this._entryId;
       const entry = entryId
         ? entries.find((e) => e.entry_id === entryId)
         : entries.find((e) => e.domain === "meshcore");
@@ -5328,8 +5711,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
   }
 
   _openSettings(tab) {
-    if (tab) this._settingsTab = tab;
-    this._setPane("settings");
+    this._navigate({ pane: "settings", tab: tab || this._settingsTab });
   }
 
   _closeSettings() {
@@ -5460,11 +5842,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         // channel names with spaces or shell metacharacters (#, $, etc.)
         // round-trip cleanly. shlex respects double-quoted strings.
         const safeName = `"${name.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-        await this._hass.callService(
-          "meshcore",
-          "execute_command",
-          this._svcData({ command: `set_channel ${idx} ${safeName} ${hash}` }),
-        );
+        await this._exec(`set_channel ${idx} ${safeName} ${hash}`);
         status.ok++;
         status.applied.push({ idx, name });
       } catch (err) {
@@ -5568,10 +5946,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       this._captureFormDraft(root);
       if (newTab !== "channels") this._applyStatus = null;
       if (newTab !== "contacts") this._contactStatus = null;
-      this._settingsTab = newTab;
-      if (newTab === "contacts") this._refreshContactsFromService();
-      if (newTab === "device") this._fetchDeviceSettings();
-      this._renderSettingsPanel();
+      this._navigate({ pane: "settings", tab: newTab }, { replace: true });
     });
 
     // Save
@@ -6306,15 +6681,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
   _wireDeviceHandlers(root) {
     if (this._settingsTab !== "device") return;
 
-    const cmd = async (c) =>
-      this._hass.callService(
-        "meshcore",
-        "execute_command",
-        this._svcData({ command: c }),
-        undefined,
-        false,
-        true,
-      );
+    const cmd = (c) => this._exec(c);
 
     const withBtn = async (btn, label, fn) => {
       if (!btn) return;
@@ -6444,14 +6811,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       withBtn(timeSyncBtn, "Syncing…", async () => {
         if (timeSyncStatus) timeSyncStatus.textContent = "";
         const ts = Math.floor(Date.now() / 1000);
-        await this._hass.callService(
-          "meshcore",
-          "execute_command",
-          this._svcData({ command: `set_time ${ts}` }),
-          undefined,
-          false,
-          true,
-        );
+        await cmd(`set_time ${ts}`);
         if (timeSyncStatus) {
           timeSyncStatus.textContent = "✓ Synced";
           timeSyncStatus.style.color = "var(--success-color, #4ade80)";
@@ -6484,7 +6844,185 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
   }
 }
 
-customElements.define("meshcore-chat-card", MeshcoreChatCard);
+// The file can be loaded twice (dashboard resource + panel module_url, with
+// different cache tags), so every registration is guarded.
+if (!customElements.get("meshcore-chat-card"))
+  customElements.define("meshcore-chat-card", MeshcoreChatCard);
+
+/* ==================================================================== *
+ *  Sidebar panel — the same UI as a full-page Home Assistant panel     *
+ *                                                                      *
+ *  configuration.yaml:                                                 *
+ *    panel_custom:                                                     *
+ *      - name: meshcore-panel                                          *
+ *        url_path: meshcore                                            *
+ *        sidebar_title: MeshCore                                       *
+ *        sidebar_icon: mdi:radio-tower                                 *
+ *        module_url: /hacsfiles/ha-meshcore-cards/meshcore-chat-card.js *
+ *        config: {}        # same options as the card (entry_id, …)    *
+ *                                                                      *
+ *  Home Assistant hands the element `hass`, `narrow`, `route` and      *
+ *  `panel`; every view is a URL under /<url_path> (see _routeToPath).  *
+ * ==================================================================== */
+class MeshcorePanel extends MeshcoreChatCard {
+  constructor() {
+    super();
+    this._routeBase = "";
+    this._haNarrow = false;
+    this._haRoute = null;
+    this._panelInfo = null;
+    this._nextHass = null;
+    this._flushQueued = false;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    this.classList.add("panel");
+  }
+
+  // HA sets hass / narrow / route / panel one after another in no guaranteed
+  // order, so the first setup waits a microtask until all of them are in.
+  set hass(hass) {
+    if (this._hass) {
+      super.hass = hass;
+      const menu = this.shadowRoot.querySelector("ha-menu-button");
+      if (menu) menu.hass = hass;
+      return;
+    }
+    this._nextHass = hass;
+    this._queueFlush();
+  }
+  get hass() {
+    return this._hass;
+  }
+
+  set panel(panel) {
+    this._panelInfo = panel;
+    this._queueFlush();
+  }
+
+  set route(route) {
+    this._haRoute = route;
+    this._queueFlush();
+  }
+
+  set narrow(narrow) {
+    this._haNarrow = !!narrow;
+    if (this.shadowRoot.firstChild) this._mountNavButtons();
+  }
+
+  _queueFlush() {
+    if (this._flushQueued) return;
+    this._flushQueued = true;
+    queueMicrotask(() => {
+      this._flushQueued = false;
+      this._flush();
+    });
+  }
+
+  _flush() {
+    const info = this._panelInfo;
+    const route = this._haRoute;
+    this._routeBase =
+      route?.prefix ?? (info?.url_path ? `/${info.url_path}` : "");
+    const parsed = this._parsePath(route?.path);
+
+    if (!this._hass) {
+      if (!this._nextHass) return;
+      this.setConfig(info?.config || {});
+      this._pendingRoute = parsed || { pane: this._config.default_pane };
+      super.hass = this._nextHass;
+      this._nextHass = null;
+      // Bare /<url_path> (or an unknown path): settle on the canonical URL.
+      if (!parsed) this._navigate({ pane: this._pane }, { replace: true });
+      return;
+    }
+    if (!parsed) {
+      this._navigate({ pane: this._config.default_pane }, { replace: true });
+    } else if (this._routeToPath(parsed) !== this._currentPath) {
+      // Browser back/forward or an external link; our own navigations have
+      // already been applied and compare equal here.
+      this._applyRoute(parsed);
+    }
+  }
+
+  _renderTopBar(unread) {
+    const p = this._pane;
+    const base = this._routeBase;
+    const tab = (pane, label, icon, badge) => {
+      const href =
+        base + this._routeToPath({ pane, tab: this._settingsTab });
+      return `<a class="app-tab${p === pane ? " active" : ""}" href="${esc(href)}" data-pane="${pane}">
+          <ha-icon icon="${icon}"></ha-icon><span>${label}</span>${badge ? `<span class="top-tab-badge">${badge}</span>` : ""}
+        </a>`;
+    };
+    return `<div class="app-bar">
+        <div class="app-nav" id="app-nav"></div>
+        <div class="app-title">${esc(this._panelInfo?.title || "MeshCore")}</div>
+        <nav class="app-tabs">
+          ${tab("chats", "Chat", "mdi:forum", unread)}
+          ${tab("nodes", "Nodes", "mdi:access-point", this._discoveredNodes.length)}
+          ${tab("console", "Console", "mdi:console")}
+          ${tab("settings", "Settings", "mdi:cog")}
+        </nav>
+      </div>`;
+  }
+
+  _wireTopBar() {
+    this._mountNavButtons();
+    this.shadowRoot.querySelector(".app-tabs").addEventListener("click", (e) => {
+      const a = e.target.closest(".app-tab");
+      // Leave modified clicks to the browser (open in new tab, etc.).
+      if (!a || e.button || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      e.preventDefault();
+      // Tapping the current tab from a narrow detail view returns to its list.
+      this._navigate({ pane: a.dataset.pane, tab: this._settingsTab });
+    });
+  }
+
+  // Menu button (HA's own when it is loaded, so the notification dot and the
+  // docked-sidebar rules match) and the sub-page back arrow.
+  _mountNavButtons() {
+    const nav = this.shadowRoot.getElementById("app-nav");
+    if (!nav) return;
+    nav.innerHTML = `<button class="app-icon-btn app-back" title="Back" aria-label="Back"><ha-icon icon="mdi:arrow-left"></ha-icon></button>`;
+    nav
+      .querySelector(".app-back")
+      .addEventListener("click", () => this._goBack());
+
+    let menu;
+    if (customElements.get("ha-menu-button")) {
+      menu = document.createElement("ha-menu-button");
+      menu.hass = this._hass;
+      menu.narrow = this._haNarrow;
+    } else {
+      // Not loaded yet when the panel is the first page opened.
+      menu = document.createElement("button");
+      menu.className = "app-icon-btn";
+      menu.title = "Sidebar";
+      menu.setAttribute("aria-label", "Sidebar");
+      menu.innerHTML = `<ha-icon icon="mdi:menu"></ha-icon>`;
+      menu.hidden =
+        !this._haNarrow && this._hass?.dockedSidebar !== "always_hidden";
+      menu.addEventListener("click", () =>
+        this.dispatchEvent(
+          new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true }),
+        ),
+      );
+      if (!this._menuUpgradeQueued) {
+        this._menuUpgradeQueued = true;
+        customElements
+          .whenDefined("ha-menu-button")
+          .then(() => this._mountNavButtons());
+      }
+    }
+    menu.classList.add("app-menu");
+    nav.prepend(menu);
+  }
+}
+
+if (!customElements.get("meshcore-panel"))
+  customElements.define("meshcore-panel", MeshcorePanel);
 
 /* ==================================================================== *
  *  Visual editor for the Lovelace UI editor (getConfigElement target)  *
@@ -6826,15 +7364,17 @@ class MeshcoreChatCardEditor extends HTMLElement {
   }
 }
 
-customElements.define("meshcore-chat-card-editor", MeshcoreChatCardEditor);
+if (!customElements.get("meshcore-chat-card-editor"))
+  customElements.define("meshcore-chat-card-editor", MeshcoreChatCardEditor);
 
 // Register with HACS/Lovelace
 window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "meshcore-chat-card",
-  name: "MeshCore Chat",
-  description: "Chat & node browser for MeshCore mesh radio networks",
-  preview: false,
-  version: CHAT_CARD_VERSION,
-  documentationURL: "https://github.com/meshcore-dev/meshcore-ha-cards",
-});
+if (!window.customCards.some((c) => c.type === "meshcore-chat-card"))
+  window.customCards.push({
+    type: "meshcore-chat-card",
+    name: "MeshCore Chat",
+    description: "Chat & node browser for MeshCore mesh radio networks",
+    preview: false,
+    version: CHAT_CARD_VERSION,
+    documentationURL: "https://github.com/meshcore-dev/meshcore-ha-cards",
+  });

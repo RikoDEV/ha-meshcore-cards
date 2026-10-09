@@ -46,7 +46,7 @@
  * `meshcore-repeater-card`.
  */
 
-const REPEATER_CARD_VERSION = "1.0.0";
+const REPEATER_CARD_VERSION = "1.1.0";
 console.info(
   `%c MESHCORE-REPEATER-CARD %c v${REPEATER_CARD_VERSION} `,
   "color:#fff;background:#1976d2;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px",
@@ -1677,8 +1677,10 @@ class MeshcoreRepeaterCard extends HTMLElement {
     if (!r) return null;
     const eid = r.online_entity || Object.values(r.sensorEntries)[0];
     if (!eid) return null;
-    // hass.entities is available in HA 2022.6+ and has config_entry_id directly.
-    const fromReg = this._hass?.entities?.[eid]?.config_entry_id;
+    // The frontend's entity registry has no config entry, but the entity's
+    // device does.
+    const deviceId = this._hass?.entities?.[eid]?.device_id;
+    const fromReg = this._hass?.devices?.[deviceId]?.config_entries?.[0];
     if (fromReg) return fromReg;
     // Fallback: query entity registry via WebSocket.
     try {
@@ -1690,6 +1692,27 @@ class MeshcoreRepeaterCard extends HTMLElement {
     } catch {
       return null;
     }
+  }
+
+  // Run one companion command (admin-only since meshcore-ha 3.0). Error-shaped
+  // responses such as {error: "rejected"} or {error: "no_response"} throw.
+  async _execCommand(entryId, command) {
+    if (this._hass?.user?.is_admin === false)
+      throw new Error("This action needs a Home Assistant administrator");
+    const r = await this._hass.callService(
+      "meshcore",
+      "execute_command",
+      { entry_id: entryId, command },
+      undefined,
+      false,
+      true,
+    );
+    const resp = r?.response;
+    if (resp && typeof resp === "object" && resp.error) {
+      const why = resp.code_string || resp.reason || resp.message;
+      throw new Error(why ? `${resp.error} (${why})` : String(resp.error));
+    }
+    return resp;
   }
 
   async _subscribeConsole() {
@@ -1709,7 +1732,10 @@ class MeshcoreRepeaterCard extends HTMLElement {
 
   _onConsoleEvent(event) {
     const d = event.data;
-    if (d?.message_type !== "direct") return;
+    if (d?.message_type !== "direct" || d.outgoing) return;
+    // 3.0 tags every event with its companion; ignore other companions' replies.
+    if (d.entry_id && this._consoleEntryId && d.entry_id !== this._consoleEntryId)
+      return;
     const r = this._selected();
     if (!r) return;
     const senderName = (d.sender_name || "").toLowerCase();
@@ -1782,19 +1808,27 @@ class MeshcoreRepeaterCard extends HTMLElement {
 
     this._consoleLog.push({ cls: "cl-sent", text: `→ ${cmd}` });
     this._appendConsoleLog();
+    this._consoleEntryId = entryId;
     try {
-      await this._hass.callService("meshcore", "execute_command", {
-        entry_id: entryId,
-        command: `send_login_sync "${r.name}" "${this._config.login_password ?? ""}"`,
-      });
+      // A login that gets no reply is not fatal (the session may still be
+      // open), so note it and let the command itself decide.
+      try {
+        await this._execCommand(
+          entryId,
+          `send_login_sync "${r.name}" "${this._config.login_password ?? ""}"`,
+        );
+      } catch (err) {
+        this._consoleLog.push({
+          cls: "cl-err",
+          text: `Login: ${err?.message || String(err)}`,
+        });
+        this._appendConsoleLog();
+      }
       // Set response handlers only after login completes so the login
       // response doesn't consume them before the command response arrives.
       if (pendingGetKeys) this._pendingGet = pendingGetKeys;
       if (showToast) this._pendingToast = true;
-      await this._hass.callService("meshcore", "execute_command", {
-        entry_id: entryId,
-        command: `send_cmd "${r.name}" "${cmd}"`,
-      });
+      await this._execCommand(entryId, `send_cmd "${r.name}" "${cmd}"`);
     } catch (err) {
       this._pendingGet = null;
       this._pendingToast = false;
