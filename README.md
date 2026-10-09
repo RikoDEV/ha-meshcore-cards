@@ -37,7 +37,7 @@ Console commands, channel provisioning, contact add/remove, adverts and device s
 
 [![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=RikoDEV&repository=ha-meshcore-cards&category=plugin)
 
-Click the button to open this repository in HACS, then click **Download** and reload the browser. Or add it by hand:
+Click the button to open this repository in HACS, then click **Download** and reload the browser. If HACS answers "Repository not found", it does not know this custom repository yet — add it by hand once:
 
 1. Open HACS in your Home Assistant sidebar.
 2. Go to **Frontend**.
@@ -46,7 +46,7 @@ Click the button to open this repository in HACS, then click **Download** and re
 5. Click **Download** on **MeshCore Companion Cards**.
 6. Reload the browser.
 
-HACS registers the resource URLs automatically. Skip to step 3 below.
+HACS registers `meshcore-chat-card.js` as a dashboard resource automatically. For the repeater card, also add `/hacsfiles/ha-meshcore-cards/meshcore-repeater-card.js` as a **JavaScript module** under **Settings → Dashboards → ⋮ → Resources**. Then continue with step 3 below.
 
 ### Method 2 — Manual
 
