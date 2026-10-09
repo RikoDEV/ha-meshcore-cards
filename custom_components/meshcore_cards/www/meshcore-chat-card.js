@@ -35,7 +35,7 @@
  * Requires meshcore-ha 3.0+ (Home Assistant 2025.6+).
  */
 
-const CHAT_CARD_VERSION = "2.0.0";
+const CHAT_CARD_VERSION = "2.2.0";
 console.info(
   `%c MESHCORE-CHAT-CARD %c v${CHAT_CARD_VERSION} `,
   "color:#fff;background:#1976d2;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px",
@@ -1009,6 +1009,18 @@ const STYLE = `
     font-size: 10px;
     white-space: nowrap;
   }
+  .msg-meta .meta-ls {
+    border-radius: 8px;
+    padding: 1px 6px;
+    font-size: 10px;
+    white-space: nowrap;
+    color: inherit;
+    text-decoration: none;
+    border: 1px dashed currentColor;
+    opacity: 0.75;
+  }
+  .msg-meta .meta-ls.seen { border-style: solid; opacity: 1; }
+  .msg-meta a.meta-ls:hover { text-decoration: underline; }
   .msg-meta .meta-rp.more {
     background: rgba(var(--rgb-secondary-text-color, 148,163,184), 0.06);
     color: var(--text3);
@@ -2145,6 +2157,10 @@ class MeshcoreChatCard extends HTMLElement {
     // meshcore_message / meshcore_delivery_update events upgrade the right
     // bubble. Values are the message objects held in this._messages.
     this._sendIndex = new Map();
+    // Optional LiteScope lookups: 1-byte channel hashes learnt from rx_log
+    // data ({ [channel_idx]: "4A" }) and the pending check timers.
+    this._channelHashes = {};
+    this._lsTimers = new Set();
     // Config entry of the companion this card talks to (resolved from the
     // device prefix when not set in config). Used to drop other companions'
     // events and to target service calls.
@@ -2167,6 +2183,12 @@ class MeshcoreChatCard extends HTMLElement {
       // hardcoded 600px previously couldn't be overridden because the
       // shadow-DOM CSS won out over outer card-mod styles.
       height: config?.height ?? null,
+      // Optional LiteScope analyzer (https://github.com/RikoDEV/litescope):
+      // base URL, and whether to resend channel messages nobody observed.
+      litescope_url: config?.litescope_url || "",
+      litescope_auto_resend: !!config?.litescope_auto_resend,
+      litescope_resend_delay: Number(config?.litescope_resend_delay) || 60,
+      litescope_max_resends: Number(config?.litescope_max_resends) || 1,
     };
     if (this._config.device_prefix)
       this._devicePrefix = this._config.device_prefix;
@@ -2338,6 +2360,14 @@ class MeshcoreChatCard extends HTMLElement {
     if (Array.isArray(s.channels)) this._config.channels = s.channels;
     if (Array.isArray(s.contacts)) this._config.contacts = s.contacts;
     if (typeof s.show_hops === "boolean") this._showHops = s.show_hops;
+    if (typeof s.litescope_url === "string")
+      this._config.litescope_url = s.litescope_url;
+    if (typeof s.litescope_auto_resend === "boolean")
+      this._config.litescope_auto_resend = s.litescope_auto_resend;
+    if (typeof s.litescope_resend_delay === "number")
+      this._config.litescope_resend_delay = s.litescope_resend_delay;
+    if (typeof s.litescope_max_resends === "number")
+      this._config.litescope_max_resends = s.litescope_max_resends;
   }
 
   set hass(hass) {
@@ -2420,6 +2450,8 @@ class MeshcoreChatCard extends HTMLElement {
       clearTimeout(this._savedPillTimer);
       this._savedPillTimer = null;
     }
+    for (const t of this._lsTimers) clearTimeout(t);
+    this._lsTimers.clear();
   }
 
   // ── Discovery from hass.states ─────────────────────────────────────
@@ -2839,6 +2871,8 @@ class MeshcoreChatCard extends HTMLElement {
       m = this._findPendingEcho(type, d.message);
       if (!m) return;
       m.meta.send_id = d.send_id;
+      // The timestamp inside the packet; LiteScope reports the same value.
+      if (d.send_timestamp) m.meta.send_timestamp = d.send_timestamp;
       this._sendIndex.set(d.send_id, m);
       // Bound the index; sends finish within a minute.
       if (this._sendIndex.size > 100)
@@ -2996,6 +3030,8 @@ class MeshcoreChatCard extends HTMLElement {
       return;
     }
 
+    this._learnChannelHashes(d.rx_log_data);
+
     // Auto-discover scope names from incoming rx_log flood_scope fields.
     if (!d.outgoing && Array.isArray(d.rx_log_data)) {
       this._loadScopeStateIfNeeded();
@@ -3074,6 +3110,7 @@ class MeshcoreChatCard extends HTMLElement {
   _handleDeliveryUpdate(event) {
     const d = event?.data || {};
     if (!this._ownsEvent(d)) return;
+    this._learnChannelHashes(d.rx_log_data);
     const apply = (m) => {
       m.meta = m.meta || {};
       if (Array.isArray(d.rx_log_data)) m.meta.rx_log_data = d.rx_log_data;
@@ -3435,13 +3472,15 @@ class MeshcoreChatCard extends HTMLElement {
       : key.startsWith("dm:")
         ? { outgoing: true, message_type: "direct", ack_received: null }
         : null;
-    this._appendMessage(key, {
+    const echo = {
       sender: this._myName || "Me",
       text,
       ts: Date.now(),
       own: true,
       meta: echoMeta,
-    });
+    };
+    this._appendMessage(key, echo);
+    this._litescopeTrack(key, echo);
     if (input) {
       input.value = "";
       input.style.height = "auto";
@@ -3520,7 +3559,8 @@ class MeshcoreChatCard extends HTMLElement {
 
   // Resend an existing message that was not received by any repeater / ACK'd.
   // Creates a fresh outgoing echo so delivery tracking starts over.
-  async _resendMessage(key, msg) {
+  // `attempt` counts automatic resends (0 = sent by the user).
+  async _resendMessage(key, msg, attempt = 0) {
     if (!this._hass || !key || !msg?.text) return;
     const text = msg.text;
     let serviceCall;
@@ -3556,16 +3596,24 @@ class MeshcoreChatCard extends HTMLElement {
           repeater_count: null,
         }
       : { outgoing: true, message_type: "direct", ack_received: null };
-    this._appendMessage(key, {
+    if (attempt) echoMeta.auto_resend = attempt;
+    const echo = {
       sender: this._config.node_name || "Me",
       text,
       ts: echoTs,
       own: true,
       meta: echoMeta,
-    });
+    };
+    this._appendMessage(key, echo);
+    this._litescopeTrack(key, echo, attempt);
     this._renderMessages();
     serviceCall
-      .catch((err) => console.error("meshcore-chat-card: resend failed", err))
+      .catch((err) => {
+        console.error("meshcore-chat-card: resend failed", err);
+        echo.meta.progressive = false;
+        echo.meta.send_error = err?.message || String(err);
+        if (key === this._activeKey) this._renderMessages();
+      })
       .finally(() => {
         if (key.startsWith("ch:")) {
           setTimeout(() => {
@@ -3590,6 +3638,186 @@ class MeshcoreChatCard extends HTMLElement {
           }, 25000);
         }
       });
+  }
+
+  // ── LiteScope (optional) ──────────────────────────────────────────
+  // LiteScope is a self-hosted MeshCore analyzer fed by observer nodes. When
+  // a URL is configured, every channel message we send is looked up there to
+  // show how far it really got: how many observers heard it, the longest hop
+  // path and the regions reached. Optionally a message that no observer and
+  // no repeater heard is sent again.
+  get _ls() {
+    const c = this._config;
+    const url = String(c.litescope_url || "")
+      .trim()
+      .replace(/\/+$/, "");
+    if (!/^https?:\/\//i.test(url)) return null;
+    return {
+      url,
+      auto: !!c.litescope_auto_resend,
+      delay: Math.max(20, Math.min(600, Number(c.litescope_resend_delay) || 60)),
+      max: Math.max(1, Math.min(3, Number(c.litescope_max_resends) || 1)),
+    };
+  }
+
+  _learnChannelHashes(rxLogData) {
+    if (!Array.isArray(rxLogData)) return;
+    for (const e of rxLogData) {
+      if (e?.channel_hash && Number.isInteger(e.channel_idx))
+        this._channelHashes[e.channel_idx] = String(e.channel_hash).toUpperCase();
+    }
+  }
+
+  // 1-byte channel hash LiteScope files messages under: first byte of
+  // sha256(channel secret). Known from traffic, or derived for the public
+  // channel and #hashtag channels (whose secret is sha256(name)[:16]).
+  async _litescopeChannelHash(idx) {
+    if (this._channelHashes[idx]) return this._channelHashes[idx];
+    const all = [...(this._allChannels || []), ...(this._serviceChannels || [])];
+    const name = String(all.find((c) => c.idx === idx)?.name || "").trim();
+    let secretHex = null;
+    if (/^public$/i.test(name)) secretHex = "8b3387e9c5cdea6ac9e5edbaa115cd72";
+    else if (name.startsWith("#")) secretHex = await sha256Hex32(name);
+    if (!secretHex) return null;
+    const bytes = new Uint8Array(
+      secretHex.match(/../g).map((h) => parseInt(h, 16)),
+    );
+    const hash = _sha256JsHex(bytes).slice(0, 2).toUpperCase();
+    this._channelHashes[idx] = hash;
+    return hash;
+  }
+
+  // Find our message among the channel's recent packets on LiteScope.
+  // Returns the packet summary, or null when LiteScope has not seen it.
+  async _litescopeLookup(key, m) {
+    const ls = this._ls;
+    const idx = this._resolveChannelIdx(key);
+    const chHash = await this._litescopeChannelHash(idx);
+    if (!chHash) throw new Error("Channel hash not known yet");
+    const resp = await fetch(
+      `${ls.url}/api/channels/${chHash}/messages?limit=50&hours=1`,
+      { signal: AbortSignal.timeout(8000) },
+    );
+    if (!resp.ok) throw new Error(`LiteScope answered HTTP ${resp.status}`);
+    const list = await resp.json();
+    if (!Array.isArray(list)) throw new Error("Unexpected LiteScope response");
+
+    const names = [this._myName, this._config.node_name, m.sender]
+      .filter(Boolean)
+      .map((n) => String(n).toLowerCase());
+    const text = m.text.trim();
+    let best = null;
+    let readable = 0;
+    for (const p of list) {
+      const d = p?.decoded || {};
+      if (d.decryptionStatus && d.decryptionStatus !== "decrypted") continue;
+      readable++;
+      const t = String(d.text || "").trim();
+      if (t !== text && !t.endsWith(`: ${text}`)) continue;
+      const sameStamp =
+        m.meta.send_timestamp &&
+        d.sender_timestamp &&
+        Math.abs(d.sender_timestamp - m.meta.send_timestamp) <= 2;
+      if (!sameStamp) {
+        // No packet timestamp to compare: fall back to sender name + time.
+        if (!names.includes(String(d.sender || "").toLowerCase())) continue;
+        const seen = Date.parse(p.firstSeen);
+        if (seen && Math.abs(seen - m.ts) > 120000) continue;
+      }
+      if (!best || sameStamp || (p.obsCount || 0) > (best.obsCount || 0))
+        best = p;
+      if (sameStamp) break;
+    }
+    if (!best && list.length && !readable)
+      throw new Error("LiteScope has no key for this channel");
+    return best;
+  }
+
+  // Schedule LiteScope checks for a channel message we just sent. Propagation
+  // keeps growing for a while, so it is polled a few times; with auto-resend
+  // on, the last check (after the configured delay) decides.
+  _litescopeTrack(key, m, attempt = 0) {
+    const ls = this._ls;
+    if (!ls || !key.startsWith("ch:") || !m?.meta) return;
+    m.meta.ls = { state: "checking" };
+    const steps = [8, 20, 45, 90].filter((sec) => !ls.auto || sec < ls.delay);
+    if (ls.auto) steps.push(ls.delay);
+    steps.forEach((sec, i) => {
+      const timer = setTimeout(() => {
+        this._lsTimers.delete(timer);
+        this._litescopeCheck(key, m, attempt, i === steps.length - 1);
+      }, sec * 1000);
+      this._lsTimers.add(timer);
+    });
+  }
+
+  async _litescopeCheck(key, m, attempt, final) {
+    const ls = this._ls;
+    const st = m.meta.ls;
+    if (!ls || !st || st.state === "resent") return;
+    if (m.meta.send_error) {
+      delete m.meta.ls;
+      return;
+    }
+    try {
+      const hit = await this._litescopeLookup(key, m);
+      if (hit) {
+        Object.assign(st, {
+          state: "seen",
+          obs: hit.obsCount || 0,
+          hops: hit.maxHops || 0,
+          regions: Array.isArray(hit.regions) ? hit.regions : [],
+          hash: hit.hash,
+        });
+      } else if (st.state !== "seen") {
+        st.state = final ? "unseen" : "checking";
+      }
+    } catch (err) {
+      // Unreachable or undecodable: no verdict, so never a reason to resend.
+      if (st.state !== "seen") {
+        st.state = final ? "error" : "checking";
+        st.error = err?.message || String(err);
+      }
+    }
+
+    // Auto-resend only on positive evidence that nobody got it: LiteScope
+    // answered and has no trace, and the companion heard no repeat either.
+    const heardLocally =
+      m.meta.repeater_count > 0 || (m.meta.rx_log_data || []).length > 0;
+    if (
+      final &&
+      ls.auto &&
+      st.state === "unseen" &&
+      !heardLocally &&
+      !m.meta.send_error &&
+      attempt < ls.max
+    ) {
+      st.state = "resent";
+      this._resendMessage(key, m, attempt + 1);
+    }
+    if (key === this._activeKey && this._pane === "chats")
+      this._renderMessages();
+  }
+
+  // Chip under an own channel message with the LiteScope verdict.
+  _renderLitescopeChip(m) {
+    const st = m.ls;
+    const ls = this._ls;
+    if (!st || !ls) return "";
+    if (st.state === "seen") {
+      const hops = `${st.hops} hop${st.hops === 1 ? "" : "s"}`;
+      const obs = `${st.obs} observer${st.obs === 1 ? "" : "s"}`;
+      const where = st.regions.length ? ` · ${st.regions.join(", ")}` : "";
+      const href = `${ls.url}/packets/${encodeURIComponent(st.hash)}/trace`;
+      return ` <a class="meta-ls seen" href="${esc(href)}" target="_blank" rel="noopener noreferrer" title="Seen on LiteScope by ${esc(obs)}, longest path ${esc(hops)}${esc(where)}. Open packet trace.">🔭 ${esc(obs)} · ${esc(hops)}</a>`;
+    }
+    if (st.state === "checking")
+      return ` <span class="meta-ls" title="Looking for this message on LiteScope">🔭 checking…</span>`;
+    if (st.state === "unseen")
+      return ` <span class="meta-ls" title="No LiteScope observer heard this message">🔭 not seen</span>`;
+    if (st.state === "resent")
+      return ` <span class="meta-ls" title="No LiteScope observer or repeater heard this message, so it was sent again">🔭 not seen · resent</span>`;
+    return ` <span class="meta-ls" title="${esc(st.error || "LiteScope lookup failed")}">🔭 unavailable</span>`;
   }
 
   // ── Console pane ──────────────────────────────────────────────────────────
@@ -3940,6 +4168,11 @@ class MeshcoreChatCard extends HTMLElement {
       compact: this._settings.compact ?? this._config.compact ?? false,
       height: this._settings.height ?? this._config.height ?? "",
       show_hops: this._showHops,
+      max_repeaters: this._settings.max_repeaters ?? 4,
+      litescope_url: this._config.litescope_url || "",
+      litescope_auto_resend: !!this._config.litescope_auto_resend,
+      litescope_resend_delay: this._config.litescope_resend_delay || 60,
+      litescope_max_resends: this._config.litescope_max_resends || 1,
     };
     this._draftChannels = this._settings.channels?.length
       ? this._settings.channels.map((c) => ({ ...c }))
@@ -4965,7 +5198,8 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     if (m.message_type === "channel") {
       const heard =
         m.repeater_count > 0 ||
-        (Array.isArray(m.rx_log_data) && m.rx_log_data.length > 0);
+        (Array.isArray(m.rx_log_data) && m.rx_log_data.length > 0) ||
+        (m.ls?.state === "seen" && m.ls.obs > 0);
       return heard ? "confirmed" : "";
     }
     return "";
@@ -4981,6 +5215,8 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     const m = msg.meta;
     if (!m || !m.outgoing || m.send_error || m.progressive) return false;
     if (this._repeatsUnknown(m)) return false;
+    // An automatic resend already replaced this message.
+    if (m.ls?.state === "resent") return false;
     return this._ackLevel(msg) !== "confirmed";
   }
 
@@ -5013,6 +5249,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       } else if (m.message_type === "channel") {
         const list = this._repeatersFromRxLog(m.rx_log_data);
         const n = m.repeater_count != null ? m.repeater_count : list.length;
+        if (m.auto_resend) scope = `auto-resend ${m.auto_resend}`;
         if (n > 0) {
           icon = "📡";
           text = `heard by ${n} repeater${n === 1 ? "" : "s"}`;
@@ -5086,7 +5323,8 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     const scopeChip = scope
       ? ` <span class="meta-scope">${esc(scope)}</span>`
       : "";
-    return `<div class="msg-meta"><span class="meta-icon">${icon}</span> ${esc(text)}${repeaterChips}${scopeChip}</div>`;
+    const lsChip = m.outgoing ? this._renderLitescopeChip(m) : "";
+    return `<div class="msg-meta"><span class="meta-icon">${icon}</span> ${esc(text)}${repeaterChips}${scopeChip}${lsChip}</div>`;
   }
 
   // Walk ALL path nodes from ALL rx_log_data entries — deduplicated, ordered by first appearance.
@@ -5756,6 +5994,18 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         1,
         Math.min(20, parseInt(d.max_repeaters, 10) || 4),
       ),
+      litescope_url: String(d.litescope_url || "")
+        .trim()
+        .replace(/\/+$/, ""),
+      litescope_auto_resend: !!d.litescope_auto_resend,
+      litescope_resend_delay: Math.max(
+        20,
+        Math.min(600, parseInt(d.litescope_resend_delay, 10) || 60),
+      ),
+      litescope_max_resends: Math.max(
+        1,
+        Math.min(3, parseInt(d.litescope_max_resends, 10) || 1),
+      ),
       channels: cleanChannels,
       contacts: cleanContacts,
     };
@@ -6041,6 +6291,24 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         <ha-formfield label="Show hops &amp; repeater info under messages">
           <ha-checkbox name="show_hops" ${d.show_hops !== false ? "checked" : ""}></ha-checkbox>
         </ha-formfield>
+        <hr/>
+        <label>LiteScope URL (optional)
+          <input type="url" name="litescope_url" value="${esc(d.litescope_url || "")}" placeholder="https://litescope.example.org" />
+          <div class="help">Address of a <a href="https://github.com/RikoDEV/litescope" target="_blank" rel="noopener noreferrer">LiteScope</a> analyzer that covers your mesh. Channel messages you send are looked up there to show how many observers heard them and over how many hops. Leave empty to turn this off.</div>
+        </label>
+        <ha-formfield label="Resend a channel message that no observer and no repeater heard">
+          <ha-checkbox name="litescope_auto_resend" ${d.litescope_auto_resend ? "checked" : ""}></ha-checkbox>
+        </ha-formfield>
+        <div class="row">
+          <label>Wait before resending (seconds)
+            <input type="number" name="litescope_resend_delay" min="20" max="600" value="${d.litescope_resend_delay || 60}" />
+            <div class="help">Also the pause between two resends. 20 to 600.</div>
+          </label>
+          <label>Resends at most
+            <input type="number" name="litescope_max_resends" min="1" max="3" value="${d.litescope_max_resends || 1}" />
+            <div class="help">1 to 3. Each resend is a new message on air.</div>
+          </label>
+        </div>
       </div>`;
   }
 
@@ -6446,6 +6714,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         "entry_id",
         "default_pane",
         "height",
+        "litescope_url",
       ];
       for (const f of fields) {
         const el = get(f);
@@ -6470,6 +6739,14 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       if (sh)
         this._draftSettings.show_hops =
           "checked" in sh ? sh.checked : sh.value === "on";
+      const lr = get("litescope_auto_resend");
+      if (lr)
+        this._draftSettings.litescope_auto_resend =
+          "checked" in lr ? lr.checked : lr.value === "on";
+      const ld = num("litescope_resend_delay");
+      if (ld !== undefined) this._draftSettings.litescope_resend_delay = ld;
+      const lm = num("litescope_max_resends");
+      if (lm !== undefined) this._draftSettings.litescope_max_resends = lm;
     }
     const chList = root.querySelector('[data-list="channels"]');
     if (chList) {

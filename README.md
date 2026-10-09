@@ -15,6 +15,7 @@ A MeshCore companion app inside Home Assistant: real-time chat, channels, direct
 - [Installation](#installation)
 - [Sidebar panel](#sidebar-panel)
 - [Chat card](#chat-card)
+- [LiteScope (optional)](#litescope-optional)
 - [Repeater card](#repeater-card)
 - [Theming](#theming)
 - [Troubleshooting](#troubleshooting)
@@ -120,6 +121,10 @@ Every option is optional and can also be set in the visual card editor.
 | `default_pane` | `chats` | Tab shown first: `chats` or `nodes` |
 | `compact` | `false` | Tighter rows in the chat list |
 | `height` | `600px` | Card height as any CSS length: `700px`, `80vh`, `"min(80vh, 900px)"`. Ignored by the panel |
+| `litescope_url` | off | Address of a LiteScope analyzer. See [LiteScope](#litescope-optional) |
+| `litescope_auto_resend` | `false` | Resend a channel message that nobody heard |
+| `litescope_resend_delay` | `60` | Seconds to wait before a resend, 20 to 600 |
+| `litescope_max_resends` | `1` | Automatic resends per message, 1 to 3 |
 
 ```yaml
 type: custom:meshcore-chat-card
@@ -171,6 +176,7 @@ Your own messages show a status line under the bubble.
 | `📡 heard by N repeaters` | Repeaters were heard relaying it; they are listed next to the status |
 | `📡 broadcast (no relays heard)` | Sent, but no repeat was heard |
 | `📡 unconfirmed (too long to hear repeats)` | The message is too long for the companion to report relayed copies |
+| `🔭 …` | What a LiteScope analyzer saw, when one is connected. See [LiteScope](#litescope-optional) |
 | `✕ <reason>` | The message never left the companion: not connected, rejected, contact missing, or held back by the mesh traffic policy |
 
 The toggle at the top right of a chat hides these lines; confirmed messages then show a small `✓` instead.
@@ -184,6 +190,38 @@ The toggle at the top right of a chat hides these lines; confirmed messages then
 ### Narrow screens
 
 When the card or panel is 640 px wide or less, the list and the conversation stack. Selecting a chat slides it in, and the back arrow returns to the list. In the panel that step is a real navigation, so the browser or phone back button works too.
+
+## LiteScope (optional)
+
+[LiteScope](https://github.com/RikoDEV/litescope) is a self-hosted MeshCore network analyzer fed by observer nodes. The companion only hears repeats within its own radio range; LiteScope sees the message wherever its observers are. Connect one that covers your mesh and every **channel message you send** gets a second status chip:
+
+| Chip | Meaning |
+|---|---|
+| `🔭 checking…` | Looking for the message on LiteScope |
+| `🔭 4 observers · 3 hops` | Heard by 4 observers; the longest path had 3 hops. Hover for the regions reached, click to open the packet trace in LiteScope |
+| `🔭 not seen` | LiteScope answered and has no trace of the message |
+| `🔭 not seen · resent` | Nobody heard it, so it was sent again |
+| `🔭 unavailable` | LiteScope could not be reached, or cannot read this channel. Hover for the reason |
+
+A message seen by at least one observer counts as delivered, so the **↺ Resend** button no longer appears on it.
+
+**Set it up** under **Settings → General → LiteScope URL** (stored per browser), or with `litescope_url:` in the card YAML. Leave it empty to turn the feature off; nothing is requested then.
+
+**Auto-resend** is off by default. When you enable it, a channel message is sent again after the configured wait only if all of these hold:
+
+- LiteScope answered and has not seen the message,
+- the companion heard no repeater relay it,
+- the send itself did not fail,
+- the resend limit (1 to 3) is not used up.
+
+The wait is also the pause between two resends. Each resend is a new message on air, and anyone who did receive the first one sees it twice, so keep the limit low. Under the Governed traffic policy a resend spends message credit like any other send.
+
+What to know:
+
+- **Channel messages only.** Direct messages are encrypted end to end, so LiteScope cannot match them.
+- **LiteScope must be able to read the channel.** Public and `#hashtag` channels work out of the box; a private channel needs its key in LiteScope's `channelKeys`.
+- **The browser talks to LiteScope directly.** If Home Assistant is served over `https`, the LiteScope URL must be `https` too, and your origin must be allowed by LiteScope's `allowedOrigins` (the default allows all).
+- **Checks stop when you leave the page.** A message is polled for up to 90 seconds after sending (or until the resend wait is over) while the card or panel stays open.
 
 ## Repeater card
 
