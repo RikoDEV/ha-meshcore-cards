@@ -20,6 +20,7 @@ from homeassistant.helpers import selector
 from .const import (
     CONF_COMPANION,
     CONF_ICON,
+    CONF_LITESCOPE_URL,
     CONF_REQUIRE_ADMIN,
     CONF_TITLE,
     CONF_URL_PATH,
@@ -31,6 +32,7 @@ from .const import (
 )
 
 _URL_PATH_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+_HTTP_URL_RE = re.compile(r"^https?://[^\s/]+", re.IGNORECASE)
 
 
 def _panel_schema(defaults: dict[str, Any]) -> dict[Any, Any]:
@@ -48,7 +50,31 @@ def _panel_schema(defaults: dict[str, Any]) -> dict[Any, Any]:
         vol.Required(
             CONF_REQUIRE_ADMIN, default=defaults.get(CONF_REQUIRE_ADMIN, False)
         ): selector.BooleanSelector(),
+        # Optional, and a suggested value rather than a default so that it can
+        # be cleared again.
+        vol.Optional(
+            CONF_LITESCOPE_URL,
+            description={"suggested_value": defaults.get(CONF_LITESCOPE_URL) or ""},
+        ): selector.TextSelector(
+            selector.TextSelectorConfig(type=selector.TextSelectorType.URL)
+        ),
     }
+
+
+def _validate(
+    hass: HomeAssistant, user_input: dict[str, Any], current_url_path: str | None = None
+) -> dict[str, str]:
+    """Normalise the submitted values in place and return field errors."""
+    errors: dict[str, str] = {}
+    user_input[CONF_URL_PATH] = user_input[CONF_URL_PATH].strip().strip("/")
+    if error := _url_path_error(hass, user_input[CONF_URL_PATH], current_url_path):
+        errors[CONF_URL_PATH] = error
+    # Always store the key: a cleared field must override an earlier value.
+    litescope = (user_input.get(CONF_LITESCOPE_URL) or "").strip().rstrip("/")
+    user_input[CONF_LITESCOPE_URL] = litescope
+    if litescope and not _HTTP_URL_RE.match(litescope):
+        errors[CONF_LITESCOPE_URL] = "invalid_litescope_url"
+    return errors
 
 
 def _url_path_error(
@@ -95,10 +121,8 @@ class MeshcoreCardsConfigFlow(ConfigFlow, domain=DOMAIN):
 
         errors: dict[str, str] = {}
         if user_input is not None:
-            user_input[CONF_URL_PATH] = user_input[CONF_URL_PATH].strip().strip("/")
-            if error := _url_path_error(self.hass, user_input[CONF_URL_PATH]):
-                errors[CONF_URL_PATH] = error
-            else:
+            errors = _validate(self.hass, user_input)
+            if not errors:
                 await self.async_set_unique_id(user_input[CONF_COMPANION])
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
@@ -145,12 +169,8 @@ class MeshcoreCardsOptionsFlow(OptionsFlow):
         current = {**self.config_entry.data, **self.config_entry.options}
         errors: dict[str, str] = {}
         if user_input is not None:
-            user_input[CONF_URL_PATH] = user_input[CONF_URL_PATH].strip().strip("/")
-            if error := _url_path_error(
-                self.hass, user_input[CONF_URL_PATH], current.get(CONF_URL_PATH)
-            ):
-                errors[CONF_URL_PATH] = error
-            else:
+            errors = _validate(self.hass, user_input, current.get(CONF_URL_PATH))
+            if not errors:
                 return self.async_create_entry(data=user_input)
 
         return self.async_show_form(

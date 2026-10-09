@@ -2161,6 +2161,9 @@ class MeshcoreChatCard extends HTMLElement {
     // data ({ [channel_idx]: "4A" }) and the pending check timers.
     this._channelHashes = {};
     this._lsTimers = new Set();
+    // LiteScope address, set in the integration's options and fetched over
+    // the websocket API (see _loadIntegrationConfig).
+    this._litescopeUrl = "";
     // Config entry of the companion this card talks to (resolved from the
     // device prefix when not set in config). Used to drop other companions'
     // events and to target service calls.
@@ -2184,8 +2187,8 @@ class MeshcoreChatCard extends HTMLElement {
       // shadow-DOM CSS won out over outer card-mod styles.
       height: config?.height ?? null,
       // Optional LiteScope analyzer (https://github.com/RikoDEV/litescope):
-      // base URL, and whether to resend channel messages nobody observed.
-      litescope_url: config?.litescope_url || "",
+      // whether to resend channel messages nobody observed. The analyzer's
+      // URL comes from the integration's configuration.
       litescope_auto_resend: !!config?.litescope_auto_resend,
       litescope_resend_delay: Number(config?.litescope_resend_delay) || 60,
       litescope_max_resends: Number(config?.litescope_max_resends) || 1,
@@ -2360,8 +2363,6 @@ class MeshcoreChatCard extends HTMLElement {
     if (Array.isArray(s.channels)) this._config.channels = s.channels;
     if (Array.isArray(s.contacts)) this._config.contacts = s.contacts;
     if (typeof s.show_hops === "boolean") this._showHops = s.show_hops;
-    if (typeof s.litescope_url === "string")
-      this._config.litescope_url = s.litescope_url;
     if (typeof s.litescope_auto_resend === "boolean")
       this._config.litescope_auto_resend = s.litescope_auto_resend;
     if (typeof s.litescope_resend_delay === "number")
@@ -2390,6 +2391,7 @@ class MeshcoreChatCard extends HTMLElement {
       // freshly-provisioned channels like "#test" appear immediately.
       this._refreshChannelsFromService();
       this._fetchDeviceSettings();
+      this._loadIntegrationConfig();
     }
   }
 
@@ -2857,6 +2859,7 @@ class MeshcoreChatCard extends HTMLElement {
     this._unsubscribers = [];
     this._unsubscribe = null;
     this._subscribe();
+    this._loadIntegrationConfig();
   }
 
   // The companion accepted a message. Tag the optimistic echo with the
@@ -3646,9 +3649,29 @@ class MeshcoreChatCard extends HTMLElement {
   // show how far it really got: how many observers heard it, the longest hop
   // path and the regions reached. Optionally a message that no observer and
   // no repeater heard is sent again.
+  // Settings that live in the meshcore_cards integration (one config entry
+  // per companion): currently the LiteScope URL. Picks the entry of this
+  // card's companion, else any entry that has a URL.
+  async _loadIntegrationConfig() {
+    if (!this._hass) return;
+    try {
+      const resp = await this._hass.callWS({ type: "meshcore_cards/config" });
+      const entries = Array.isArray(resp?.entries) ? resp.entries : [];
+      const mine =
+        entries.find((e) => e.companion_entry_id === this._entryId) ||
+        entries.find((e) => e.litescope_url);
+      this._litescopeUrl = mine?.litescope_url || "";
+    } catch (err) {
+      console.debug("meshcore-chat-card: integration config unavailable:", err);
+      this._litescopeUrl = "";
+    }
+    if (this._pane === "settings" && this._settingsTab === "general")
+      this._renderSettingsPanel();
+  }
+
   get _ls() {
     const c = this._config;
-    const url = String(c.litescope_url || "")
+    const url = String(this._litescopeUrl || "")
       .trim()
       .replace(/\/+$/, "");
     if (!/^https?:\/\//i.test(url)) return null;
@@ -4169,7 +4192,6 @@ class MeshcoreChatCard extends HTMLElement {
       height: this._settings.height ?? this._config.height ?? "",
       show_hops: this._showHops,
       max_repeaters: this._settings.max_repeaters ?? 4,
-      litescope_url: this._config.litescope_url || "",
       litescope_auto_resend: !!this._config.litescope_auto_resend,
       litescope_resend_delay: this._config.litescope_resend_delay || 60,
       litescope_max_resends: this._config.litescope_max_resends || 1,
@@ -5994,9 +6016,6 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         1,
         Math.min(20, parseInt(d.max_repeaters, 10) || 4),
       ),
-      litescope_url: String(d.litescope_url || "")
-        .trim()
-        .replace(/\/+$/, ""),
       litescope_auto_resend: !!d.litescope_auto_resend,
       litescope_resend_delay: Math.max(
         20,
@@ -6292,9 +6311,12 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
           <ha-checkbox name="show_hops" ${d.show_hops !== false ? "checked" : ""}></ha-checkbox>
         </ha-formfield>
         <hr/>
-        <label>LiteScope URL (optional)
-          <input type="url" name="litescope_url" value="${esc(d.litescope_url || "")}" placeholder="https://litescope.example.org" />
-          <div class="help">Address of a <a href="https://github.com/RikoDEV/litescope" target="_blank" rel="noopener noreferrer">LiteScope</a> analyzer that covers your mesh. Channel messages you send are looked up there to show how many observers heard them and over how many hops. Leave empty to turn this off.</div>
+        <label>LiteScope
+          <div class="help">${
+            this._ls
+              ? `Connected to <a href="${esc(this._ls.url)}" target="_blank" rel="noopener noreferrer">${esc(this._ls.url)}</a>. Channel messages you send are looked up there to show how many observers heard them and over how many hops.`
+              : `Not connected. To show how far your channel messages travel, set the address of a <a href="https://github.com/RikoDEV/litescope" target="_blank" rel="noopener noreferrer">LiteScope</a> analyzer under Settings → Devices &amp; Services → MeshCore Companion Cards → Configure.`
+          }</div>
         </label>
         <ha-formfield label="Resend a channel message that no observer and no repeater heard">
           <ha-checkbox name="litescope_auto_resend" ${d.litescope_auto_resend ? "checked" : ""}></ha-checkbox>
@@ -6714,7 +6736,6 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         "entry_id",
         "default_pane",
         "height",
-        "litescope_url",
       ];
       for (const f of fields) {
         const el = get(f);

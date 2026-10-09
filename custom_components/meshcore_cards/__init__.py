@@ -7,11 +7,14 @@ one sidebar panel per config entry (one entry per MeshCore companion).
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
-from homeassistant.components import frontend, panel_custom
+import voluptuous as vol
+
+from homeassistant.components import frontend, panel_custom, websocket_api
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
@@ -21,6 +24,7 @@ from .const import (
     CHAT_CARD_JS,
     CONF_COMPANION,
     CONF_ICON,
+    CONF_LITESCOPE_URL,
     CONF_REQUIRE_ADMIN,
     CONF_TITLE,
     CONF_URL_PATH,
@@ -56,7 +60,30 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     # available on dashboards without adding them as resources.
     for filename in (CHAT_CARD_JS, REPEATER_CARD_JS):
         frontend.add_extra_js_url(hass, _module_url(filename, version))
+    websocket_api.async_register_command(hass, _ws_config)
     return True
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/config"})
+@callback
+def _ws_config(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Hand the cards and panels the settings kept in the config entries."""
+    entries = []
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if entry.disabled_by is not None:
+            continue
+        conf = {**entry.data, **entry.options}
+        entries.append(
+            {
+                "companion_entry_id": conf.get(CONF_COMPANION),
+                "litescope_url": conf.get(CONF_LITESCOPE_URL) or "",
+            }
+        )
+    connection.send_result(msg["id"], {"entries": entries})
 
 
 async def async_setup_entry(

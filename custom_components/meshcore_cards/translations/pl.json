@@ -9,16 +9,19 @@
           "title": "Tytuł w pasku bocznym",
           "icon": "Ikona w pasku bocznym",
           "url_path": "Ścieżka URL",
-          "require_admin": "Pokazuj tylko administratorom"
+          "require_admin": "Pokazuj tylko administratorom",
+          "litescope_url": "Adres LiteScope (opcjonalnie)"
         },
         "data_description": {
-          "url_path": "Panel otwiera się pod adresem /<ścieżka URL>. Małe litery, cyfry, myślniki i podkreślenia."
+          "url_path": "Panel otwiera się pod adresem /<ścieżka URL>. Małe litery, cyfry, myślniki i podkreślenia.",
+          "litescope_url": "Adres analizatora LiteScope obejmującego Twoją sieć, na przykład https://litescope.example.org. Wysłane wiadomości kanałowe są tam wyszukiwane, aby pokazać obserwatorów i liczbę przeskoków. Zostaw puste, aby wyłączyć."
         }
       }
     },
     "error": {
       "invalid_url_path": "Użyj tylko małych liter, cyfr, myślników i podkreśleń.",
-      "url_path_in_use": "Inny panel lub dashboard używa już tej ścieżki URL."
+      "url_path_in_use": "Inny panel lub dashboard używa już tej ścieżki URL.",
+      "invalid_litescope_url": "Podaj pełny adres zaczynający się od http:// lub https://."
     },
     "abort": {
       "no_companions": "Nie znaleziono urządzenia companion MeshCore. Najpierw skonfiguruj integrację MeshCore.",
@@ -34,16 +37,19 @@
           "title": "Tytuł w pasku bocznym",
           "icon": "Ikona w pasku bocznym",
           "url_path": "Ścieżka URL",
-          "require_admin": "Pokazuj tylko administratorom"
+          "require_admin": "Pokazuj tylko administratorom",
+          "litescope_url": "Adres LiteScope (opcjonalnie)"
         },
         "data_description": {
-          "url_path": "Panel otwiera się pod adresem /<ścieżka URL>. Małe litery, cyfry, myślniki i podkreślenia."
+          "url_path": "Panel otwiera się pod adresem /<ścieżka URL>. Małe litery, cyfry, myślniki i podkreślenia.",
+          "litescope_url": "Adres analizatora LiteScope obejmującego Twoją sieć, na przykład https://litescope.example.org. Wysłane wiadomości kanałowe są tam wyszukiwane, aby pokazać obserwatorów i liczbę przeskoków. Zostaw puste, aby wyłączyć."
         }
       }
     },
     "error": {
       "invalid_url_path": "Użyj tylko małych liter, cyfr, myślników i podkreśleń.",
-      "url_path_in_use": "Inny panel lub dashboard używa już tej ścieżki URL."
+      "url_path_in_use": "Inny panel lub dashboard używa już tej ścieżki URL.",
+      "invalid_litescope_url": "Podaj pełny adres zaczynający się od http:// lub https://."
     }
   }
 }

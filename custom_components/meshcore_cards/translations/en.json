@@ -9,16 +9,19 @@
           "title": "Sidebar title",
           "icon": "Sidebar icon",
           "url_path": "URL path",
-          "require_admin": "Show to administrators only"
+          "require_admin": "Show to administrators only",
+          "litescope_url": "LiteScope URL (optional)"
         },
         "data_description": {
-          "url_path": "The panel opens at /<URL path>. Lowercase letters, digits, hyphens and underscores."
+          "url_path": "The panel opens at /<URL path>. Lowercase letters, digits, hyphens and underscores.",
+          "litescope_url": "Address of a LiteScope analyzer that covers your mesh, for example https://litescope.example.org. Sent channel messages are looked up there to show observers and hop count. Leave empty to turn this off."
         }
       }
     },
     "error": {
       "invalid_url_path": "Use lowercase letters, digits, hyphens and underscores only.",
-      "url_path_in_use": "Another panel or dashboard already uses this URL path."
+      "url_path_in_use": "Another panel or dashboard already uses this URL path.",
+      "invalid_litescope_url": "Enter a full address starting with http:// or https://."
     },
     "abort": {
       "no_companions": "No MeshCore companion found. Set up the MeshCore integration first.",
@@ -34,16 +37,19 @@
           "title": "Sidebar title",
           "icon": "Sidebar icon",
           "url_path": "URL path",
-          "require_admin": "Show to administrators only"
+          "require_admin": "Show to administrators only",
+          "litescope_url": "LiteScope URL (optional)"
         },
         "data_description": {
-          "url_path": "The panel opens at /<URL path>. Lowercase letters, digits, hyphens and underscores."
+          "url_path": "The panel opens at /<URL path>. Lowercase letters, digits, hyphens and underscores.",
+          "litescope_url": "Address of a LiteScope analyzer that covers your mesh, for example https://litescope.example.org. Sent channel messages are looked up there to show observers and hop count. Leave empty to turn this off."
         }
       }
     },
     "error": {
       "invalid_url_path": "Use lowercase letters, digits, hyphens and underscores only.",
-      "url_path_in_use": "Another panel or dashboard already uses this URL path."
+      "url_path_in_use": "Another panel or dashboard already uses this URL path.",
+      "invalid_litescope_url": "Enter a full address starting with http:// or https://."
     }
   }
 }

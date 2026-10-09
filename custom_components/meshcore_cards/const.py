@@ -18,6 +18,7 @@ CONF_TITLE = "title"
 CONF_ICON = "icon"
 CONF_URL_PATH = "url_path"
 CONF_REQUIRE_ADMIN = "require_admin"
+CONF_LITESCOPE_URL = "litescope_url"
 
 DEFAULT_TITLE = "MeshCore"
 DEFAULT_ICON = "mdi:radio-tower"

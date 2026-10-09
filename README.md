@@ -97,7 +97,7 @@ The panel fills the page, uses the Home Assistant app bar, and gives every view 
 | `/meshcore/console` | Command console |
 | `/meshcore/settings/<tab>` | Settings: `general`, `device`, `channels`, `contacts`, `about` |
 
-- **Change it:** **Settings → Devices & Services → MeshCore Companion Cards → Configure** edits the title, icon and URL path, and can limit the panel to administrators.
+- **Change it:** **Settings → Devices & Services → MeshCore Companion Cards → Configure** edits the title, icon and URL path, can limit the panel to administrators, and sets the optional [LiteScope](#litescope-optional) address.
 - **Several companions:** add the integration once per companion. Each gets its own panel and URL path.
 - **Remove it:** delete the integration entry.
 
@@ -121,8 +121,7 @@ Every option is optional and can also be set in the visual card editor.
 | `default_pane` | `chats` | Tab shown first: `chats` or `nodes` |
 | `compact` | `false` | Tighter rows in the chat list |
 | `height` | `600px` | Card height as any CSS length: `700px`, `80vh`, `"min(80vh, 900px)"`. Ignored by the panel |
-| `litescope_url` | off | Address of a LiteScope analyzer. See [LiteScope](#litescope-optional) |
-| `litescope_auto_resend` | `false` | Resend a channel message that nobody heard |
+| `litescope_auto_resend` | `false` | Resend a channel message that nobody heard. Needs a [LiteScope](#litescope-optional) address in the integration |
 | `litescope_resend_delay` | `60` | Seconds to wait before a resend, 20 to 600 |
 | `litescope_max_resends` | `1` | Automatic resends per message, 1 to 3 |
 
@@ -205,9 +204,9 @@ When the card or panel is 640 px wide or less, the list and the conversation sta
 
 A message seen by at least one observer counts as delivered, so the **↺ Resend** button no longer appears on it.
 
-**Set it up** under **Settings → General → LiteScope URL** (stored per browser), or with `litescope_url:` in the card YAML. Leave it empty to turn the feature off; nothing is requested then.
+**Set it up** in the integration: **Settings → Devices & Services → MeshCore Companion Cards → Configure → LiteScope URL** (the same field is offered when you first add the integration). It applies to that companion's panel and cards for every user and browser. Reload the browser after changing it. Leave it empty to turn the feature off; nothing is requested then.
 
-**Auto-resend** is off by default. When you enable it, a channel message is sent again after the configured wait only if all of these hold:
+**Auto-resend** is off by default and is a per-browser preference: enable it under the chat's **Settings → General**, or with `litescope_auto_resend:` in the card YAML. A channel message is sent again after the configured wait only if all of these hold:
 
 - LiteScope answered and has not seen the message,
 - the companion heard no repeater relay it,
