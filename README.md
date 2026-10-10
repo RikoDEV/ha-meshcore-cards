@@ -124,6 +124,7 @@ Every option is optional and can also be set in the visual card editor.
 | `litescope_auto_resend` | `false` | Resend a channel message that nobody heard. Needs a [LiteScope](#litescope-optional) address in the integration |
 | `litescope_resend_delay` | `60` | Seconds to wait before a resend, 20 to 600 |
 | `litescope_max_resends` | `1` | Automatic resends per message, 1 to 3 |
+| `litescope_min_hops` | `1` | Hops a channel message must travel to count as delivered, 0 to 10. `0` only requires that it was seen |
 
 ```yaml
 type: custom:meshcore-chat-card
@@ -200,16 +201,17 @@ When the card or panel is 640 px wide or less, the list and the conversation sta
 | `🔭 4 observers · 3 hops` | Heard by 4 observers; the longest path had 3 hops. Hover for the regions reached, click to open the packet trace in LiteScope |
 | `🔭 not seen` | LiteScope answered and has no trace of the message |
 | `🔭 not seen · resent` | Nobody heard it, so it was sent again |
+| `🔭 1 observer · 0 hops · resent` | It was heard but did not travel the minimum number of hops, so it was sent again |
 | `🔭 unavailable` | LiteScope could not be reached, or cannot read this channel. Hover for the reason |
 
-A message seen by at least one observer counts as delivered, so the **↺ Resend** button no longer appears on it.
+A message counts as delivered when an observer saw it **and** its longest path reached the minimum hop count (1 by default, so it was relayed at least once). The **↺ Resend** button then no longer appears on it. A repeat the companion heard itself counts as one hop.
 
 **Set it up** in the integration: **Settings → Devices & Services → MeshCore Companion Cards → Configure → LiteScope URL** (the same field is offered when you first add the integration). It applies to that companion's panel and cards for every user and browser. Reload the browser after changing it. Leave it empty to turn the feature off; nothing is requested then.
 
 **Auto-resend** is off by default and is a per-browser preference: enable it under the chat's **Settings → General**, or with `litescope_auto_resend:` in the card YAML. A channel message is sent again after the configured wait only if all of these hold:
 
-- LiteScope answered and has not seen the message,
-- the companion heard no repeater relay it,
+- LiteScope answered, and either has not seen the message or saw it travel fewer hops than **Minimum hops**,
+- a repeat the companion heard itself does not already satisfy the minimum (it counts as one hop),
 - the send itself did not fail,
 - the resend limit (1 to 3) is not used up.
 

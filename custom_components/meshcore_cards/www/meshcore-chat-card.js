@@ -35,7 +35,20 @@
  * Requires meshcore-ha 3.0+ (Home Assistant 2025.6+).
  */
 
-const CHAT_CARD_VERSION = "2.2.1";
+// Wait for Home Assistant before defining anything. The integration loads
+// this file as an "extra module", which races the frontend's own bundle. That
+// bundle installs a scoped custom-element-registry polyfill; an element
+// registered before it is invisible to the polyfilled customElements.get(),
+// so the dashboard reports "Custom element doesn't exist". The root
+// <home-assistant> element is only defined once the polyfill is in place.
+if (!customElements.get("home-assistant")) {
+  await Promise.race([
+    customElements.whenDefined("home-assistant"),
+    new Promise((resolve) => setTimeout(resolve, 30000)),
+  ]);
+}
+
+const CHAT_CARD_VERSION = "2.3.0";
 console.info(
   `%c MESHCORE-CHAT-CARD %c v${CHAT_CARD_VERSION} `,
   "color:#fff;background:#1976d2;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px",
@@ -1489,7 +1502,6 @@ const STYLE = `
     display: flex; flex-direction: column; gap: 4px; flex: 1;
     font-size: 12px; font-weight: 600; color: var(--text2);
   }
-  .form .row > label > .help { margin-top: auto; }
   /* Native inputs styled to match HA's filled text field look */
   .form input[type="text"],
   .form input[type="number"],
@@ -1511,7 +1523,30 @@ const STYLE = `
   .form select:focus {
     border-bottom: 2px solid var(--primary-color);
   }
-  .form ha-formfield { display: block; padding: 4px 0; }
+  .form label.check {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .form label.check input {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .form a { color: var(--accent); }
+  .form input, .form select { min-width: 0; max-width: 100%; }
+  /* Narrow layout: one field per line, so labels and help text of different
+     lengths can no longer push the inputs of a row out of alignment. */
+  :host(.narrow) .form .row { flex-direction: column; gap: 12px; }
+  :host(.narrow) .modal-body { padding: 14px 12px; }
+  :host(.narrow) .modal-tab { letter-spacing: 0.02em; padding: 10px 2px 8px; }
   .dvc-field { margin-bottom: 8px; }
   .dvc-row { display: flex; align-items: flex-end; gap: 8px; }
   .dvc-row label, .radio-group label {
@@ -2192,6 +2227,9 @@ class MeshcoreChatCard extends HTMLElement {
       litescope_auto_resend: !!config?.litescope_auto_resend,
       litescope_resend_delay: Number(config?.litescope_resend_delay) || 60,
       litescope_max_resends: Number(config?.litescope_max_resends) || 1,
+      // Resend too when the longest observed path is shorter than this many
+      // hops (0 = only when the message was not seen at all).
+      litescope_min_hops: config?.litescope_min_hops ?? 1,
     };
     if (this._config.device_prefix)
       this._devicePrefix = this._config.device_prefix;
@@ -2369,6 +2407,8 @@ class MeshcoreChatCard extends HTMLElement {
       this._config.litescope_resend_delay = s.litescope_resend_delay;
     if (typeof s.litescope_max_resends === "number")
       this._config.litescope_max_resends = s.litescope_max_resends;
+    if (typeof s.litescope_min_hops === "number")
+      this._config.litescope_min_hops = s.litescope_min_hops;
   }
 
   set hass(hass) {
@@ -3301,6 +3341,8 @@ class MeshcoreChatCard extends HTMLElement {
       // Whatever was still in flight when the page went away is over by now.
       if (Date.now() - r.ts > 30000) meta.progressive = false;
       if (meta.ls?.state === "checking") delete meta.ls;
+      if (meta.ls?.state === "resent")
+        meta.ls = { ...meta.ls, state: "unseen", resent: true }; // 2.2.0 format
       // The logbook entry of a direct message is written after the ACK wait,
       // so allow a generous gap between it and the stored send time.
       // Our name in the logbook can differ from the one the echo used, so in
@@ -3788,11 +3830,13 @@ class MeshcoreChatCard extends HTMLElement {
       .trim()
       .replace(/\/+$/, "");
     if (!/^https?:\/\//i.test(url)) return null;
+    const minHops = Number(c.litescope_min_hops);
     return {
       url,
       auto: !!c.litescope_auto_resend,
       delay: Math.max(20, Math.min(600, Number(c.litescope_resend_delay) || 60)),
       max: Math.max(1, Math.min(3, Number(c.litescope_max_resends) || 1)),
+      minHops: Number.isFinite(minHops) ? Math.max(0, Math.min(10, minHops)) : 1,
     };
   }
 
@@ -3890,7 +3934,7 @@ class MeshcoreChatCard extends HTMLElement {
   async _litescopeCheck(key, m, attempt, final) {
     const ls = this._ls;
     const st = m.meta.ls;
-    if (!ls || !st || st.state === "resent") return;
+    if (!ls || !st || st.resent) return;
     if (m.meta.send_error) {
       delete m.meta.ls;
       return;
@@ -3916,24 +3960,39 @@ class MeshcoreChatCard extends HTMLElement {
       }
     }
 
-    // Auto-resend only on positive evidence that nobody got it: LiteScope
-    // answered and has no trace, and the companion heard no repeat either.
-    const heardLocally =
-      m.meta.repeater_count > 0 || (m.meta.rx_log_data || []).length > 0;
+    // Auto-resend only on positive evidence from a LiteScope answer: either
+    // nobody got the message, or it did not travel the configured number of
+    // hops. A repeat the companion heard itself proves one hop.
     if (
       final &&
       ls.auto &&
-      st.state === "unseen" &&
-      !heardLocally &&
       !m.meta.send_error &&
-      attempt < ls.max
+      attempt < ls.max &&
+      this._litescopeFellShort(m.meta)
     ) {
-      st.state = "resent";
+      st.resent = true;
       this._resendMessage(key, m, attempt + 1);
     }
     this._touchOutbox();
     if (key === this._activeKey && this._pane === "chats")
       this._renderMessages();
+  }
+
+  // True when LiteScope answered and the message got nowhere, or not as far
+  // as `litescope_min_hops` asks for.
+  _litescopeFellShort(m) {
+    const ls = this._ls;
+    const st = m.ls;
+    if (!ls || !st || (st.state !== "seen" && st.state !== "unseen"))
+      return false;
+    const heardLocally =
+      m.repeater_count > 0 || (m.rx_log_data || []).length > 0;
+    if (st.state === "unseen" && !heardLocally) return true;
+    const hops = Math.max(
+      st.state === "seen" ? st.hops || 0 : 0,
+      heardLocally ? 1 : 0,
+    );
+    return hops < ls.minHops;
   }
 
   // Chip under an own channel message with the LiteScope verdict.
@@ -3946,14 +4005,18 @@ class MeshcoreChatCard extends HTMLElement {
       const obs = `${st.obs} observer${st.obs === 1 ? "" : "s"}`;
       const where = st.regions.length ? ` · ${st.regions.join(", ")}` : "";
       const href = `${ls.url}/packets/${encodeURIComponent(st.hash)}/trace`;
-      return ` <a class="meta-ls seen" href="${esc(href)}" target="_blank" rel="noopener noreferrer" title="Seen on LiteScope by ${esc(obs)}, longest path ${esc(hops)}${esc(where)}. Open packet trace.">🔭 ${esc(obs)} · ${esc(hops)}</a>`;
+      const again = st.resent ? " · resent" : "";
+      const why = st.resent
+        ? ` It travelled fewer than ${ls.minHops} hop${ls.minHops === 1 ? "" : "s"}, so it was sent again.`
+        : "";
+      return ` <a class="meta-ls seen" href="${esc(href)}" target="_blank" rel="noopener noreferrer" title="Seen on LiteScope by ${esc(obs)}, longest path ${esc(hops)}${esc(where)}.${esc(why)} Open packet trace.">🔭 ${esc(obs)} · ${esc(hops)}${again}</a>`;
     }
     if (st.state === "checking")
       return ` <span class="meta-ls" title="Looking for this message on LiteScope">🔭 checking…</span>`;
     if (st.state === "unseen")
-      return ` <span class="meta-ls" title="No LiteScope observer heard this message">🔭 not seen</span>`;
-    if (st.state === "resent")
-      return ` <span class="meta-ls" title="No LiteScope observer or repeater heard this message, so it was sent again">🔭 not seen · resent</span>`;
+      return st.resent
+        ? ` <span class="meta-ls" title="No LiteScope observer heard this message, so it was sent again">🔭 not seen · resent</span>`
+        : ` <span class="meta-ls" title="No LiteScope observer heard this message">🔭 not seen</span>`;
     return ` <span class="meta-ls" title="${esc(st.error || "LiteScope lookup failed")}">🔭 unavailable</span>`;
   }
 
@@ -4309,6 +4372,7 @@ class MeshcoreChatCard extends HTMLElement {
       litescope_auto_resend: !!this._config.litescope_auto_resend,
       litescope_resend_delay: this._config.litescope_resend_delay || 60,
       litescope_max_resends: this._config.litescope_max_resends || 1,
+      litescope_min_hops: this._config.litescope_min_hops ?? 1,
     };
     this._draftChannels = this._settings.channels?.length
       ? this._settings.channels.map((c) => ({ ...c }))
@@ -5336,7 +5400,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       const heard =
         m.repeater_count > 0 ||
         (Array.isArray(m.rx_log_data) && m.rx_log_data.length > 0) ||
-        (m.ls?.state === "seen" && m.ls.obs > 0);
+        (m.ls?.state === "seen" && m.ls.obs > 0 && !this._litescopeFellShort(m));
       return heard ? "confirmed" : "";
     }
     return "";
@@ -5353,7 +5417,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     if (!m || !m.outgoing || m.send_error || m.progressive) return false;
     if (this._repeatsUnknown(m)) return false;
     // An automatic resend already replaced this message.
-    if (m.ls?.state === "resent") return false;
+    if (m.ls?.resent) return false;
     return this._ackLevel(msg) !== "confirmed";
   }
 
@@ -6140,6 +6204,10 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         1,
         Math.min(3, parseInt(d.litescope_max_resends, 10) || 1),
       ),
+      litescope_min_hops: Math.max(
+        0,
+        Math.min(10, parseInt(d.litescope_min_hops ?? 1, 10) || 0),
+      ),
       channels: cleanChannels,
       contacts: cleanContacts,
     };
@@ -6419,12 +6487,14 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
           <input type="text" name="height" value="${esc(d.height || "")}" placeholder="e.g. 700px, 80vh (default 600px)" />
           <div class="help">Any CSS length: <code>800px</code> · <code>80vh</code> · <code>min(80vh,1000px)</code>. Empty = 600px.</div>
         </label>
-        <ha-formfield label="Compact row spacing">
-          <ha-checkbox name="compact" ${d.compact ? "checked" : ""}></ha-checkbox>
-        </ha-formfield>
-        <ha-formfield label="Show hops &amp; repeater info under messages">
-          <ha-checkbox name="show_hops" ${d.show_hops !== false ? "checked" : ""}></ha-checkbox>
-        </ha-formfield>
+        <label class="check">
+          <input type="checkbox" name="compact" ${d.compact ? "checked" : ""} />
+          <span>Compact row spacing</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" name="show_hops" ${d.show_hops !== false ? "checked" : ""} />
+          <span>Show hops &amp; repeater info under messages</span>
+        </label>
         <hr/>
         <label>LiteScope
           <div class="help">${
@@ -6433,10 +6503,15 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
               : `Not connected. To show how far your channel messages travel, set the address of a <a href="https://github.com/RikoDEV/litescope" target="_blank" rel="noopener noreferrer">LiteScope</a> analyzer under Settings → Devices &amp; Services → MeshCore Companion Cards → Configure.`
           }</div>
         </label>
-        <ha-formfield label="Resend a channel message that no observer and no repeater heard">
-          <ha-checkbox name="litescope_auto_resend" ${d.litescope_auto_resend ? "checked" : ""}></ha-checkbox>
-        </ha-formfield>
+        <label class="check">
+          <input type="checkbox" name="litescope_auto_resend" ${d.litescope_auto_resend ? "checked" : ""} />
+          <span>Resend a channel message that was not heard, or did not travel far enough</span>
+        </label>
         <div class="row">
+          <label>Minimum hops
+            <input type="number" name="litescope_min_hops" min="0" max="10" value="${d.litescope_min_hops ?? 1}" />
+            <div class="help">Resend when the longest path is shorter than this. 0 = only when not seen at all.</div>
+          </label>
           <label>Wait before resending (seconds)
             <input type="number" name="litescope_resend_delay" min="20" max="600" value="${d.litescope_resend_delay || 60}" />
             <div class="help">Also the pause between two resends. 20 to 600.</div>
@@ -6883,6 +6958,8 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       if (ld !== undefined) this._draftSettings.litescope_resend_delay = ld;
       const lm = num("litescope_max_resends");
       if (lm !== undefined) this._draftSettings.litescope_max_resends = lm;
+      const lh = num("litescope_min_hops");
+      if (lh !== undefined) this._draftSettings.litescope_min_hops = lh;
     }
     const chList = root.querySelector('[data-list="channels"]');
     if (chList) {
