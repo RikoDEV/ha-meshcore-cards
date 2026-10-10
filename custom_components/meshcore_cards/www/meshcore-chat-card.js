@@ -35,6 +35,19 @@
  * Requires meshcore-ha 3.0+ (Home Assistant 2025.6+).
  */
 
+// Wait for Home Assistant before defining anything. The integration loads
+// this file as an "extra module", which races the frontend's own bundle. That
+// bundle installs a scoped custom-element-registry polyfill; an element
+// registered before it is invisible to the polyfilled customElements.get(),
+// so the dashboard reports "Custom element doesn't exist". The root
+// <home-assistant> element is only defined once the polyfill is in place.
+if (!customElements.get("home-assistant")) {
+  await Promise.race([
+    customElements.whenDefined("home-assistant"),
+    new Promise((resolve) => setTimeout(resolve, 30000)),
+  ]);
+}
+
 const CHAT_CARD_VERSION = "2.3.0";
 console.info(
   `%c MESHCORE-CHAT-CARD %c v${CHAT_CARD_VERSION} `,

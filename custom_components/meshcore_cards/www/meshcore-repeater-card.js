@@ -44,6 +44,19 @@
  * `meshcore-repeater-card`.
  */
 
+// Wait for Home Assistant before defining anything. The integration loads
+// this file as an "extra module", which races the frontend's own bundle. That
+// bundle installs a scoped custom-element-registry polyfill; an element
+// registered before it is invisible to the polyfilled customElements.get(),
+// so the dashboard reports "Custom element doesn't exist". The root
+// <home-assistant> element is only defined once the polyfill is in place.
+if (!customElements.get("home-assistant")) {
+  await Promise.race([
+    customElements.whenDefined("home-assistant"),
+    new Promise((resolve) => setTimeout(resolve, 30000)),
+  ]);
+}
+
 const REPEATER_CARD_VERSION = "1.1.0";
 console.info(
   `%c MESHCORE-REPEATER-CARD %c v${REPEATER_CARD_VERSION} `,
