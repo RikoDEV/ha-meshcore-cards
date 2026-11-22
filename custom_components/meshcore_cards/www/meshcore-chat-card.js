@@ -49,7 +49,7 @@ if (!customElements.get("home-assistant")) {
   ]);
 }
 
-const CHAT_CARD_VERSION = "2.3.0";
+const CHAT_CARD_VERSION = "2.3.1";
 console.info(
   `%c MESHCORE-CHAT-CARD %c v${CHAT_CARD_VERSION} `,
   "color:#fff;background:#1976d2;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px",
