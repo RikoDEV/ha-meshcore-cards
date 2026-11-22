@@ -24,6 +24,7 @@
  *   history_hours: 24                  # backlog hours to load from logbook (default 24)
  *   default_pane: chats                # "chats" | "nodes"
  *   compact: false                     # tighter row spacing
+ *   max_message_bytes: auto            # "auto" or a UTF-8 byte limit, e.g. 130
  *
  * The same options are editable via the gear icon in the sidebar (companion
  * settings) and via the Lovelace visual editor (getConfigElement).
@@ -56,6 +57,15 @@ console.info(
 );
 
 const LS_PREFIX = "meshcore-chat-card:";
+
+// MeshCore text messages are limited to 160 bytes by the firmware.
+const MC_MAX_TEXT_BYTES = 160;
+const utf8Bytes = (s) => new TextEncoder().encode(String(s ?? "")).length;
+// "auto" or a positive integer; anything else falls back to "auto".
+const parseMaxMessageBytes = (v) => {
+  const n = Number(String(v ?? "").trim());
+  return Number.isInteger(n) && n > 0 ? n : "auto";
+};
 
 const esc = (s) =>
   String(s ?? "")
@@ -1198,9 +1208,19 @@ const STYLE = `
     border-top: 1px solid var(--border);
     background: var(--bg2);
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     align-items: flex-end;
   }
+  .byte-counter {
+    flex: 0 0 100%;
+    margin-bottom: -4px;
+    padding: 0 6px;
+    font-size: 11px;
+    text-align: right;
+    color: var(--text3);
+  }
+  .byte-counter.over { color: var(--error-color, #e5484d); font-weight: 600; }
   .msg-input {
     flex: 1;
     background: var(--bg3);
@@ -2230,6 +2250,8 @@ class MeshcoreChatCard extends HTMLElement {
       // Resend too when the longest observed path is shorter than this many
       // hops (0 = only when the message was not seen at all).
       litescope_min_hops: config?.litescope_min_hops ?? 1,
+      // Outgoing message size limit in UTF-8 bytes: "auto" or a number.
+      max_message_bytes: parseMaxMessageBytes(config?.max_message_bytes),
     };
     if (this._config.device_prefix)
       this._devicePrefix = this._config.device_prefix;
@@ -2409,6 +2431,10 @@ class MeshcoreChatCard extends HTMLElement {
       this._config.litescope_max_resends = s.litescope_max_resends;
     if (typeof s.litescope_min_hops === "number")
       this._config.litescope_min_hops = s.litescope_min_hops;
+    if (s.max_message_bytes !== undefined)
+      this._config.max_message_bytes = parseMaxMessageBytes(
+        s.max_message_bytes,
+      );
   }
 
   set hass(hass) {
@@ -3523,6 +3549,43 @@ class MeshcoreChatCard extends HTMLElement {
     return resp;
   }
 
+  // UTF-8 byte limit for the message being composed in `key` ("auto" derives
+  // it from the firmware's 160-byte text limit, minus the "<name>: " prefix
+  // the companion adds to channel messages).
+  _byteLimit(key) {
+    const v = parseMaxMessageBytes(this._config.max_message_bytes);
+    if (v !== "auto") return v;
+    if (key && key.startsWith("ch:"))
+      return Math.max(1, MC_MAX_TEXT_BYTES - utf8Bytes(this._myName) - 2);
+    return MC_MAX_TEXT_BYTES;
+  }
+
+  // Bytes and limit of the complete outgoing message (reply prefix included).
+  _composerBytes(inputEl) {
+    const key = this._activeKey;
+    const body = (inputEl?.value || "").trim();
+    const reply = this._replyDrafts[key] || null;
+    const used = body ? utf8Bytes(this._buildReplyText(reply, body)) : 0;
+    return { used, limit: this._byteLimit(key), empty: !body };
+  }
+
+  _updateByteCounter() {
+    const input = this.shadowRoot.querySelector(".msg-input");
+    const counter = this.shadowRoot.querySelector(".byte-counter");
+    const btn = this.shadowRoot.querySelector(".send-btn");
+    if (!input || !counter) return;
+    const { used, limit } = this._composerBytes(input);
+    const over = used > limit;
+    counter.textContent = over
+      ? `${used} / ${limit} bytes — message too long`
+      : `${used} / ${limit} bytes`;
+    counter.classList.toggle("over", over);
+    if (btn) {
+      btn.disabled = over || !!this._sending;
+      btn.title = over ? "Message exceeds the byte limit" : "Send";
+    }
+  }
+
   get _myName() {
     return this._deviceSettings.deviceName ?? this._config.node_name ?? "";
   }
@@ -3538,6 +3601,11 @@ class MeshcoreChatCard extends HTMLElement {
       this._pane !== "chats"
     )
       return;
+
+    if (this._composerBytes(input).used > this._byteLimit(this._activeKey)) {
+      this._updateByteCounter();
+      return;
+    }
 
     this._sending = true;
     const btn = this.shadowRoot.querySelector(".send-btn");
@@ -3687,6 +3755,7 @@ class MeshcoreChatCard extends HTMLElement {
         if (btn) btn.disabled = false;
         const input2 = this.shadowRoot.querySelector(".msg-input");
         if (input2) input2.focus();
+        this._updateByteCounter();
         // If no final delivery update arrives, clear "sending…" so the status
         // doesn't stay stuck. Repeat collection runs for up to 20s.
         if (key.startsWith("ch:")) {
@@ -4373,6 +4442,7 @@ class MeshcoreChatCard extends HTMLElement {
       litescope_resend_delay: this._config.litescope_resend_delay || 60,
       litescope_max_resends: this._config.litescope_max_resends || 1,
       litescope_min_hops: this._config.litescope_min_hops ?? 1,
+      max_message_bytes: this._config.max_message_bytes ?? "auto",
     };
     this._draftChannels = this._settings.channels?.length
       ? this._settings.channels.map((c) => ({ ...c }))
@@ -5637,7 +5707,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     const existingRb = this.shadowRoot.getElementById("reply-bar");
     if (existingRb) existingRb.remove();
 
-    el.innerHTML = `<textarea class="msg-input" placeholder="${reply ? `Mention @${esc(reply.sender || "user")}…` : "Type a message…"}" maxlength="200" rows="1" data-bwignore></textarea><button class="send-btn" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>`;
+    el.innerHTML = `<div class="byte-counter"></div><textarea class="msg-input" placeholder="${reply ? `Mention @${esc(reply.sender || "user")}…` : "Type a message…"}" rows="1" data-bwignore></textarea><button class="send-btn" title="Send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>`;
 
     if (reply) {
       el.insertAdjacentHTML(
@@ -5671,6 +5741,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
     input.addEventListener("input", () => {
       _autoResize();
       this._updateAutocomplete(input);
+      this._updateByteCounter();
     });
     input.addEventListener("keydown", (e) => {
       if (this._autocomplete) {
@@ -5709,6 +5780,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
       }
     });
     btn.addEventListener("click", () => this._sendMessage());
+    this._updateByteCounter();
   }
 
   // ── Autocomplete ──────────────────────────────────────────────────────────
@@ -6208,6 +6280,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         0,
         Math.min(10, parseInt(d.litescope_min_hops ?? 1, 10) || 0),
       ),
+      max_message_bytes: parseMaxMessageBytes(d.max_message_bytes),
       channels: cleanChannels,
       contacts: cleanContacts,
     };
@@ -6477,6 +6550,10 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
           </label>
           <label>Max messages / chat
             <input type="number" name="max_messages" min="20" max="2000" value="${d.max_messages || 200}" />
+          </label>
+          <label>Max message bytes
+            <input type="text" name="max_message_bytes" value="${esc(String(d.max_message_bytes ?? "auto"))}" placeholder="auto" />
+            <div class="help"><code>auto</code> or a number of UTF-8 bytes (e.g. 130). Auto = 160, minus your node name and 2 for channel messages.</div>
           </label>
           <label>Max repeater chips
             <input type="number" name="max_repeaters" min="1" max="20" value="${d.max_repeaters ?? 4}" />
@@ -6926,6 +7003,7 @@ ${subLabel ? `<text x="${p.x.toFixed(1)}" y="${(p.y + 21).toFixed(1)}" text-anch
         "entry_id",
         "default_pane",
         "height",
+        "max_message_bytes",
       ];
       for (const f of fields) {
         const el = get(f);
@@ -7600,6 +7678,7 @@ class MeshcoreChatCardEditor extends HTMLElement {
       default_pane: config?.default_pane === "nodes" ? "nodes" : "chats",
       compact: !!config?.compact,
       height: config?.height ?? "",
+      max_message_bytes: parseMaxMessageBytes(config?.max_message_bytes),
       channels: Array.isArray(config?.channels)
         ? config.channels.map((c) => ({ idx: c.idx, name: c.name || "" }))
         : [],
@@ -7647,6 +7726,8 @@ class MeshcoreChatCardEditor extends HTMLElement {
     if (out.history_hours === 24) delete out.history_hours;
     out.height = String(out.height ?? "").trim();
     if (!out.height) delete out.height;
+    out.max_message_bytes = parseMaxMessageBytes(out.max_message_bytes);
+    if (out.max_message_bytes === "auto") delete out.max_message_bytes;
 
     out.channels = (this._config.channels || [])
       .map((c) => ({
@@ -7680,7 +7761,13 @@ class MeshcoreChatCardEditor extends HTMLElement {
   _capture() {
     const root = this.shadowRoot;
     const get = (n) => root.querySelector(`[name="${n}"]`);
-    const tx = ["node_name", "device_prefix", "entry_id", "height"];
+    const tx = [
+      "node_name",
+      "device_prefix",
+      "entry_id",
+      "height",
+      "max_message_bytes",
+    ];
     for (const f of tx) {
       const el = get(f);
       if (el) this._config[f] = el.value;
@@ -7767,6 +7854,10 @@ class MeshcoreChatCardEditor extends HTMLElement {
           <input type="checkbox" name="compact" ${c.compact ? "checked" : ""} />
           Compact row spacing
         </label>
+        <label>Max message bytes
+          <input type="text" name="max_message_bytes" value="${esc(String(c.max_message_bytes ?? "auto"))}" placeholder="auto" />
+        </label>
+        <div class="help"><code>auto</code> or a number of UTF-8 bytes (e.g. <code>130</code>). Auto = 160, minus your node name and 2 for channel messages.</div>
 
         <hr/>
         <h4>Channels</h4>

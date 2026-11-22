@@ -1,26 +1,71 @@
+<div align="center">
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="custom_components/meshcore_cards/brand/dark_logo@2x.png">
+    <img src="custom_components/meshcore_cards/brand/logo@2x.png" alt="MeshCore Companion Cards" width="360" />
+  </picture>
+</p>
+
 # MeshCore Companion Cards for Home Assistant
 
-A MeshCore companion app inside Home Assistant: real-time chat, channels, direct messages, contacts, a node browser, a command console and repeater telemetry. It runs as a full-page sidebar panel and as dashboard cards.
+**A MeshCore companion app inside Home Assistant: chat, channels, contacts, a node browser, a command console and repeater telemetry.**
+
+Runs as a full-page sidebar panel and as dashboard cards. Installed with HACS, configured from the UI, no dashboard resources to add.
+
+[![Validate](https://github.com/RikoDEV/ha-meshcore-cards/actions/workflows/validate.yaml/badge.svg)](https://github.com/RikoDEV/ha-meshcore-cards/actions/workflows/validate.yaml)
+[![HACS: Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
+[![Home Assistant: 2025.6+](https://img.shields.io/badge/Home%20Assistant-2025.6%2B-blue.svg)](https://www.home-assistant.io)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 [![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=RikoDEV&repository=ha-meshcore-cards&category=integration)
 
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#installation">Installation</a> ·
+  <a href="#chat-card">Chat card</a> ·
+  <a href="#repeater-card">Repeater card</a> ·
+  <a href="#troubleshooting">Troubleshooting</a>
+</p>
+
+</div>
+
+---
+
+<p align="center">
 <img width="2560" height="1269" alt="MeshCore chat" src="https://github.com/user-attachments/assets/a3b80ca7-6280-48d9-aec4-e8eb907edd9b" />
-
+<br><br>
 <img width="2560" height="1269" alt="MeshCore repeater card" src="https://github.com/user-attachments/assets/96ed2ad6-b4d6-49ff-ab70-ab10b54f2996" />
+</p>
 
-## Contents
+---
 
-- [What you get](#what-you-get)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Sidebar panel](#sidebar-panel)
-- [Chat card](#chat-card)
-- [LiteScope (optional)](#litescope-optional)
-- [Repeater card](#repeater-card)
-- [Theming](#theming)
-- [Troubleshooting](#troubleshooting)
-- [Bot automations](#bot-automations)
-- [Related](#related)
+## Features
+
+**Chat**
+- Channels and direct messages with live delivery status, replies, `@` mentions and `#channel` links
+- Byte-aware composer with a live counter and a configurable `max_message_bytes` limit
+- Optional [LiteScope](#litescope-optional) lookups and automatic resend of messages nobody heard
+
+**Network**
+- Node browser with type, online state, details and a map
+- Command console, channel provisioning, contacts, adverts and device settings
+- Repeater card with stat tiles, history charts, settings and a console
+
+**Setup**
+- One integration provides the panel and both cards, with a URL for every view
+- Follows your Home Assistant theme; one panel per companion
+
+## Quick start
+
+1. Click the HACS button above, then **Download**, and restart Home Assistant.
+2. Go to **Settings** → **Devices & services** → **Add integration** → **MeshCore Companion Cards** and pick your companion.
+3. Open **MeshCore** in the sidebar, or add `type: custom:meshcore-chat-card` to a dashboard.
+
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=meshcore_cards)
+
+Requires [meshcore-ha](https://github.com/meshcore-dev/meshcore-ha) 3.0 or newer and Home Assistant 2025.6 or newer. Details are under [Requirements](#requirements) and [Installation](#installation).
 
 ## What you get
 
@@ -120,6 +165,7 @@ Every option is optional and can also be set in the visual card editor.
 | `history_hours` | `24` | Hours of logbook history loaded when a chat is first opened |
 | `default_pane` | `chats` | Tab shown first: `chats` or `nodes` |
 | `compact` | `false` | Tighter rows in the chat list |
+| `max_message_bytes` | `auto` | Outgoing message limit in UTF-8 bytes. `auto` = 160 for direct messages, `160 - bytes(node name) - 2` for channels; or set a number (e.g. `130`). The composer shows a live counter and blocks sending above the limit |
 | `height` | `600px` | Card height as any CSS length: `700px`, `80vh`, `"min(80vh, 900px)"`. Ignored by the panel |
 | `litescope_auto_resend` | `false` | Resend a channel message that nobody heard. Needs a [LiteScope](#litescope-optional) address in the integration |
 | `litescope_resend_delay` | `60` | Seconds to wait before a resend, 20 to 600 |
@@ -387,3 +433,11 @@ Set `my_rpt_prefix` to `''` to turn the override off.
 - [meshcore-ha](https://github.com/meshcore-dev/meshcore-ha): the integration these cards build on
 - [meshcore-ha documentation](https://meshcore-dev.github.io/meshcore-ha/): sensors, services, events and the traffic policy
 - [MeshCore](https://github.com/meshcore-dev/MeshCore): the radio firmware
+
+## Contributing
+
+Bug reports and pull requests are welcome. Please open an issue first for larger changes.
+
+## License
+
+The code in this repository is licensed under the [MIT License](LICENSE).
