@@ -1,0 +1,55 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Een MeshCore-paneel toevoegen",
+        "description": "Voegt een MeshCore-chatpaneel toe aan de zijbalk voor één companion. De dashboardkaarten zijn beschikbaar zodra deze integratie is ingesteld.",
+        "data": {
+          "companion_entry_id": "Companion",
+          "title": "Titel in zijbalk",
+          "icon": "Pictogram in zijbalk",
+          "url_path": "URL-pad",
+          "require_admin": "Alleen tonen aan beheerders",
+          "litescope_url": "LiteScope-URL (optioneel)"
+        },
+        "data_description": {
+          "url_path": "Het paneel opent op het pad dat je hier invoert. Kleine letters, cijfers, koppeltekens en underscores.",
+          "litescope_url": "Adres van een LiteScope-analyzer die je mesh dekt. Verzonden kanaalberichten worden daar opgezocht om waarnemers en het aantal hops te tonen. Laat leeg om dit uit te schakelen."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Gebruik alleen kleine letters, cijfers, koppeltekens en underscores.",
+      "url_path_in_use": "Een ander paneel of dashboard gebruikt dit URL-pad al.",
+      "invalid_litescope_url": "Voer een volledig adres in dat begint met http:// of https://."
+    },
+    "abort": {
+      "no_companions": "Geen MeshCore-companion gevonden. Stel eerst de MeshCore-integratie in.",
+      "all_companions_configured": "Elke MeshCore-companion heeft al een paneel.",
+      "already_configured": "Deze companion heeft al een paneel."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "MeshCore-paneel",
+        "data": {
+          "title": "Titel in zijbalk",
+          "icon": "Pictogram in zijbalk",
+          "url_path": "URL-pad",
+          "require_admin": "Alleen tonen aan beheerders",
+          "litescope_url": "LiteScope-URL (optioneel)"
+        },
+        "data_description": {
+          "url_path": "Het paneel opent op het pad dat je hier invoert. Kleine letters, cijfers, koppeltekens en underscores.",
+          "litescope_url": "Adres van een LiteScope-analyzer die je mesh dekt. Verzonden kanaalberichten worden daar opgezocht om waarnemers en het aantal hops te tonen. Laat leeg om dit uit te schakelen."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Gebruik alleen kleine letters, cijfers, koppeltekens en underscores.",
+      "url_path_in_use": "Een ander paneel of dashboard gebruikt dit URL-pad al.",
+      "invalid_litescope_url": "Voer een volledig adres in dat begint met http:// of https://."
+    }
+  }
+}

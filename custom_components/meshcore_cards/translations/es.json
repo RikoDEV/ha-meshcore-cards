@@ -1,0 +1,55 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Añadir un panel de MeshCore",
+        "description": "Añade un panel de chat de MeshCore a la barra lateral para un companion. Las tarjetas del panel de control están disponibles en cuanto se configura esta integración.",
+        "data": {
+          "companion_entry_id": "Companion",
+          "title": "Título de la barra lateral",
+          "icon": "Icono de la barra lateral",
+          "url_path": "Ruta de URL",
+          "require_admin": "Mostrar solo a administradores",
+          "litescope_url": "URL de LiteScope (opcional)"
+        },
+        "data_description": {
+          "url_path": "El panel se abre en la ruta que introduzcas aquí. Letras minúsculas, dígitos, guiones y guiones bajos.",
+          "litescope_url": "Dirección de un analizador LiteScope que cubra tu malla. Los mensajes de canal enviados se buscan allí para mostrar observadores y número de saltos. Déjalo vacío para desactivarlo."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Usa solo letras minúsculas, dígitos, guiones y guiones bajos.",
+      "url_path_in_use": "Otro panel o panel de control ya usa esta ruta de URL.",
+      "invalid_litescope_url": "Introduce una dirección completa que empiece por http:// o https://."
+    },
+    "abort": {
+      "no_companions": "No se encontró ningún companion de MeshCore. Configura primero la integración MeshCore.",
+      "all_companions_configured": "Todos los companions de MeshCore ya tienen un panel.",
+      "already_configured": "Este companion ya tiene un panel."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Panel de MeshCore",
+        "data": {
+          "title": "Título de la barra lateral",
+          "icon": "Icono de la barra lateral",
+          "url_path": "Ruta de URL",
+          "require_admin": "Mostrar solo a administradores",
+          "litescope_url": "URL de LiteScope (opcional)"
+        },
+        "data_description": {
+          "url_path": "El panel se abre en la ruta que introduzcas aquí. Letras minúsculas, dígitos, guiones y guiones bajos.",
+          "litescope_url": "Dirección de un analizador LiteScope que cubra tu malla. Los mensajes de canal enviados se buscan allí para mostrar observadores y número de saltos. Déjalo vacío para desactivarlo."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Usa solo letras minúsculas, dígitos, guiones y guiones bajos.",
+      "url_path_in_use": "Otro panel o panel de control ya usa esta ruta de URL.",
+      "invalid_litescope_url": "Introduce una dirección completa que empiece por http:// o https://."
+    }
+  }
+}

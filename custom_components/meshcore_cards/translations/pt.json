@@ -1,0 +1,55 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Adicionar um painel MeshCore",
+        "description": "Adiciona um painel de chat MeshCore à barra lateral para um companion. Os cartões do painel ficam disponíveis assim que esta integração for configurada.",
+        "data": {
+          "companion_entry_id": "Companion",
+          "title": "Título da barra lateral",
+          "icon": "Ícone da barra lateral",
+          "url_path": "Caminho do URL",
+          "require_admin": "Mostrar apenas a administradores",
+          "litescope_url": "URL do LiteScope (opcional)"
+        },
+        "data_description": {
+          "url_path": "O painel abre no caminho que introduzir aqui. Letras minúsculas, dígitos, hífenes e sublinhados.",
+          "litescope_url": "Endereço de um analisador LiteScope que cubra a sua malha. As mensagens de canal enviadas são procuradas aí para mostrar observadores e número de saltos. Deixe vazio para desativar."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Use apenas letras minúsculas, dígitos, hífenes e sublinhados.",
+      "url_path_in_use": "Outro painel ou dashboard já usa este caminho de URL.",
+      "invalid_litescope_url": "Introduza um endereço completo que comece por http:// ou https://."
+    },
+    "abort": {
+      "no_companions": "Nenhum companion MeshCore encontrado. Configure primeiro a integração MeshCore.",
+      "all_companions_configured": "Todos os companions MeshCore já têm um painel.",
+      "already_configured": "Este companion já tem um painel."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Painel MeshCore",
+        "data": {
+          "title": "Título da barra lateral",
+          "icon": "Ícone da barra lateral",
+          "url_path": "Caminho do URL",
+          "require_admin": "Mostrar apenas a administradores",
+          "litescope_url": "URL do LiteScope (opcional)"
+        },
+        "data_description": {
+          "url_path": "O painel abre no caminho que introduzir aqui. Letras minúsculas, dígitos, hífenes e sublinhados.",
+          "litescope_url": "Endereço de um analisador LiteScope que cubra a sua malha. As mensagens de canal enviadas são procuradas aí para mostrar observadores e número de saltos. Deixe vazio para desativar."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Use apenas letras minúsculas, dígitos, hífenes e sublinhados.",
+      "url_path_in_use": "Outro painel ou dashboard já usa este caminho de URL.",
+      "invalid_litescope_url": "Introduza um endereço completo que comece por http:// ou https://."
+    }
+  }
+}

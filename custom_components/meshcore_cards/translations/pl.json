@@ -13,8 +13,8 @@
           "litescope_url": "Adres LiteScope (opcjonalnie)"
         },
         "data_description": {
-          "url_path": "Panel otwiera się pod adresem /<ścieżka URL>. Małe litery, cyfry, myślniki i podkreślenia.",
-          "litescope_url": "Adres analizatora LiteScope obejmującego Twoją sieć, na przykład https://litescope.example.org. Wysłane wiadomości kanałowe są tam wyszukiwane, aby pokazać obserwatorów i liczbę przeskoków. Zostaw puste, aby wyłączyć."
+          "url_path": "Panel otwiera się pod wpisaną tutaj ścieżką. Małe litery, cyfry, myślniki i podkreślenia.",
+          "litescope_url": "Adres analizatora LiteScope obejmującego Twoją sieć. Wysłane wiadomości kanałowe są tam wyszukiwane, aby pokazać obserwatorów i liczbę przeskoków. Zostaw puste, aby wyłączyć."
         }
       }
     },
@@ -41,8 +41,8 @@
           "litescope_url": "Adres LiteScope (opcjonalnie)"
         },
         "data_description": {
-          "url_path": "Panel otwiera się pod adresem /<ścieżka URL>. Małe litery, cyfry, myślniki i podkreślenia.",
-          "litescope_url": "Adres analizatora LiteScope obejmującego Twoją sieć, na przykład https://litescope.example.org. Wysłane wiadomości kanałowe są tam wyszukiwane, aby pokazać obserwatorów i liczbę przeskoków. Zostaw puste, aby wyłączyć."
+          "url_path": "Panel otwiera się pod wpisaną tutaj ścieżką. Małe litery, cyfry, myślniki i podkreślenia.",
+          "litescope_url": "Adres analizatora LiteScope obejmującego Twoją sieć. Wysłane wiadomości kanałowe są tam wyszukiwane, aby pokazać obserwatorów i liczbę przeskoków. Zostaw puste, aby wyłączyć."
         }
       }
     },

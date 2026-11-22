@@ -13,8 +13,8 @@
           "litescope_url": "LiteScope URL (optional)"
         },
         "data_description": {
-          "url_path": "The panel opens at /<URL path>. Lowercase letters, digits, hyphens and underscores.",
-          "litescope_url": "Address of a LiteScope analyzer that covers your mesh, for example https://litescope.example.org. Sent channel messages are looked up there to show observers and hop count. Leave empty to turn this off."
+          "url_path": "The panel opens at the path you enter here. Lowercase letters, digits, hyphens and underscores.",
+          "litescope_url": "Address of a LiteScope analyzer that covers your mesh. Sent channel messages are looked up there to show observers and hop count. Leave empty to turn this off."
         }
       }
     },
@@ -41,8 +41,8 @@
           "litescope_url": "LiteScope URL (optional)"
         },
         "data_description": {
-          "url_path": "The panel opens at /<URL path>. Lowercase letters, digits, hyphens and underscores.",
-          "litescope_url": "Address of a LiteScope analyzer that covers your mesh, for example https://litescope.example.org. Sent channel messages are looked up there to show observers and hop count. Leave empty to turn this off."
+          "url_path": "The panel opens at the path you enter here. Lowercase letters, digits, hyphens and underscores.",
+          "litescope_url": "Address of a LiteScope analyzer that covers your mesh. Sent channel messages are looked up there to show observers and hop count. Leave empty to turn this off."
         }
       }
     },

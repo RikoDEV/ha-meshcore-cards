@@ -1,0 +1,55 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Ajouter un panneau MeshCore",
+        "description": "Ajoute un panneau de discussion MeshCore à la barre latérale pour un companion. Les cartes de tableau de bord sont disponibles dès que cette intégration est configurée.",
+        "data": {
+          "companion_entry_id": "Companion",
+          "title": "Titre dans la barre latérale",
+          "icon": "Icône de la barre latérale",
+          "url_path": "Chemin d'URL",
+          "require_admin": "Afficher uniquement aux administrateurs",
+          "litescope_url": "URL LiteScope (facultatif)"
+        },
+        "data_description": {
+          "url_path": "Le panneau s'ouvre au chemin saisi ici. Lettres minuscules, chiffres, tirets et tirets bas.",
+          "litescope_url": "Adresse d'un analyseur LiteScope couvrant votre réseau maillé. Les messages de canal envoyés y sont recherchés pour afficher les observateurs et le nombre de sauts. Laisser vide pour désactiver."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Utilisez uniquement des lettres minuscules, des chiffres, des tirets et des tirets bas.",
+      "url_path_in_use": "Un autre panneau ou tableau de bord utilise déjà ce chemin d'URL.",
+      "invalid_litescope_url": "Saisissez une adresse complète commençant par http:// ou https://."
+    },
+    "abort": {
+      "no_companions": "Aucun companion MeshCore trouvé. Configurez d'abord l'intégration MeshCore.",
+      "all_companions_configured": "Chaque companion MeshCore a déjà un panneau.",
+      "already_configured": "Ce companion a déjà un panneau."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Panneau MeshCore",
+        "data": {
+          "title": "Titre dans la barre latérale",
+          "icon": "Icône de la barre latérale",
+          "url_path": "Chemin d'URL",
+          "require_admin": "Afficher uniquement aux administrateurs",
+          "litescope_url": "URL LiteScope (facultatif)"
+        },
+        "data_description": {
+          "url_path": "Le panneau s'ouvre au chemin saisi ici. Lettres minuscules, chiffres, tirets et tirets bas.",
+          "litescope_url": "Adresse d'un analyseur LiteScope couvrant votre réseau maillé. Les messages de canal envoyés y sont recherchés pour afficher les observateurs et le nombre de sauts. Laisser vide pour désactiver."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Utilisez uniquement des lettres minuscules, des chiffres, des tirets et des tirets bas.",
+      "url_path_in_use": "Un autre panneau ou tableau de bord utilise déjà ce chemin d'URL.",
+      "invalid_litescope_url": "Saisissez une adresse complète commençant par http:// ou https://."
+    }
+  }
+}

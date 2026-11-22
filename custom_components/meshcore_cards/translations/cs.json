@@ -1,0 +1,55 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Přidat panel MeshCore",
+        "description": "Přidá do postranního panelu chatovací panel MeshCore pro jeden companion. Karty dashboardu jsou dostupné ihned po nastavení této integrace.",
+        "data": {
+          "companion_entry_id": "Companion",
+          "title": "Název v postranním panelu",
+          "icon": "Ikona v postranním panelu",
+          "url_path": "Cesta URL",
+          "require_admin": "Zobrazit pouze správcům",
+          "litescope_url": "URL LiteScope (volitelné)"
+        },
+        "data_description": {
+          "url_path": "Panel se otevře na zde zadané cestě. Malá písmena, číslice, pomlčky a podtržítka.",
+          "litescope_url": "Adresa analyzátoru LiteScope pokrývajícího vaši síť. Odeslané zprávy kanálu se tam vyhledávají, aby se zobrazili pozorovatelé a počet skoků. Ponechte prázdné pro vypnutí."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Použijte pouze malá písmena, číslice, pomlčky a podtržítka.",
+      "url_path_in_use": "Jiný panel nebo dashboard již tuto cestu URL používá.",
+      "invalid_litescope_url": "Zadejte úplnou adresu začínající http:// nebo https://."
+    },
+    "abort": {
+      "no_companions": "Nebyl nalezen žádný companion MeshCore. Nejprve nastavte integraci MeshCore.",
+      "all_companions_configured": "Každý companion MeshCore již má panel.",
+      "already_configured": "Tento companion již má panel."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Panel MeshCore",
+        "data": {
+          "title": "Název v postranním panelu",
+          "icon": "Ikona v postranním panelu",
+          "url_path": "Cesta URL",
+          "require_admin": "Zobrazit pouze správcům",
+          "litescope_url": "URL LiteScope (volitelné)"
+        },
+        "data_description": {
+          "url_path": "Panel se otevře na zde zadané cestě. Malá písmena, číslice, pomlčky a podtržítka.",
+          "litescope_url": "Adresa analyzátoru LiteScope pokrývajícího vaši síť. Odeslané zprávy kanálu se tam vyhledávají, aby se zobrazili pozorovatelé a počet skoků. Ponechte prázdné pro vypnutí."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Použijte pouze malá písmena, číslice, pomlčky a podtržítka.",
+      "url_path_in_use": "Jiný panel nebo dashboard již tuto cestu URL používá.",
+      "invalid_litescope_url": "Zadejte úplnou adresu začínající http:// nebo https://."
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Aggiungi un pannello MeshCore",
+        "description": "Aggiunge alla barra laterale un pannello chat MeshCore per un companion. Le schede della dashboard sono disponibili non appena questa integrazione è configurata.",
+        "data": {
+          "companion_entry_id": "Companion",
+          "title": "Titolo della barra laterale",
+          "icon": "Icona della barra laterale",
+          "url_path": "Percorso URL",
+          "require_admin": "Mostra solo agli amministratori",
+          "litescope_url": "URL LiteScope (facoltativo)"
+        },
+        "data_description": {
+          "url_path": "Il pannello si apre al percorso inserito qui. Lettere minuscole, cifre, trattini e trattini bassi.",
+          "litescope_url": "Indirizzo di un analizzatore LiteScope che copre la tua mesh. I messaggi di canale inviati vengono cercati lì per mostrare osservatori e numero di hop. Lascia vuoto per disattivare."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Usa solo lettere minuscole, cifre, trattini e trattini bassi.",
+      "url_path_in_use": "Un altro pannello o dashboard usa già questo percorso URL.",
+      "invalid_litescope_url": "Inserisci un indirizzo completo che inizi con http:// o https://."
+    },
+    "abort": {
+      "no_companions": "Nessun companion MeshCore trovato. Configura prima l'integrazione MeshCore.",
+      "all_companions_configured": "Ogni companion MeshCore ha già un pannello.",
+      "already_configured": "Questo companion ha già un pannello."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Pannello MeshCore",
+        "data": {
+          "title": "Titolo della barra laterale",
+          "icon": "Icona della barra laterale",
+          "url_path": "Percorso URL",
+          "require_admin": "Mostra solo agli amministratori",
+          "litescope_url": "URL LiteScope (facoltativo)"
+        },
+        "data_description": {
+          "url_path": "Il pannello si apre al percorso inserito qui. Lettere minuscole, cifre, trattini e trattini bassi.",
+          "litescope_url": "Indirizzo di un analizzatore LiteScope che copre la tua mesh. I messaggi di canale inviati vengono cercati lì per mostrare osservatori e numero di hop. Lascia vuoto per disattivare."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Usa solo lettere minuscole, cifre, trattini e trattini bassi.",
+      "url_path_in_use": "Un altro pannello o dashboard usa già questo percorso URL.",
+      "invalid_litescope_url": "Inserisci un indirizzo completo che inizi con http:// o https://."
+    }
+  }
+}

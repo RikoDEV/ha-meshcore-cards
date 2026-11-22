@@ -1,0 +1,55 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "MeshCore-Panel hinzufügen",
+        "description": "Fügt der Seitenleiste ein MeshCore-Chat-Panel für einen Companion hinzu. Die Dashboard-Karten sind verfügbar, sobald diese Integration eingerichtet ist.",
+        "data": {
+          "companion_entry_id": "Companion",
+          "title": "Titel in der Seitenleiste",
+          "icon": "Symbol in der Seitenleiste",
+          "url_path": "URL-Pfad",
+          "require_admin": "Nur für Administratoren anzeigen",
+          "litescope_url": "LiteScope-URL (optional)"
+        },
+        "data_description": {
+          "url_path": "Das Panel öffnet sich unter dem hier eingegebenen Pfad. Kleinbuchstaben, Ziffern, Bindestriche und Unterstriche.",
+          "litescope_url": "Adresse eines LiteScope-Analysators, der dein Mesh abdeckt. Gesendete Kanalnachrichten werden dort nachgeschlagen, um Beobachter und Hop-Anzahl anzuzeigen. Leer lassen, um dies zu deaktivieren."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Verwende nur Kleinbuchstaben, Ziffern, Bindestriche und Unterstriche.",
+      "url_path_in_use": "Ein anderes Panel oder Dashboard verwendet diesen URL-Pfad bereits.",
+      "invalid_litescope_url": "Gib eine vollständige Adresse ein, die mit http:// oder https:// beginnt."
+    },
+    "abort": {
+      "no_companions": "Kein MeshCore-Companion gefunden. Richte zuerst die MeshCore-Integration ein.",
+      "all_companions_configured": "Jeder MeshCore-Companion hat bereits ein Panel.",
+      "already_configured": "Dieser Companion hat bereits ein Panel."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "MeshCore-Panel",
+        "data": {
+          "title": "Titel in der Seitenleiste",
+          "icon": "Symbol in der Seitenleiste",
+          "url_path": "URL-Pfad",
+          "require_admin": "Nur für Administratoren anzeigen",
+          "litescope_url": "LiteScope-URL (optional)"
+        },
+        "data_description": {
+          "url_path": "Das Panel öffnet sich unter dem hier eingegebenen Pfad. Kleinbuchstaben, Ziffern, Bindestriche und Unterstriche.",
+          "litescope_url": "Adresse eines LiteScope-Analysators, der dein Mesh abdeckt. Gesendete Kanalnachrichten werden dort nachgeschlagen, um Beobachter und Hop-Anzahl anzuzeigen. Leer lassen, um dies zu deaktivieren."
+        }
+      }
+    },
+    "error": {
+      "invalid_url_path": "Verwende nur Kleinbuchstaben, Ziffern, Bindestriche und Unterstriche.",
+      "url_path_in_use": "Ein anderes Panel oder Dashboard verwendet diesen URL-Pfad bereits.",
+      "invalid_litescope_url": "Gib eine vollständige Adresse ein, die mit http:// oder https:// beginnt."
+    }
+  }
+}
